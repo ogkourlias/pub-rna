@@ -1,9 +1,8 @@
 nextflow.enable.dsl=2
 
 process fastq_dump {
-  debug true
   scratch true
-  containerOptions '--bind /groups/'
+  
   errorStrategy 'finish'
   time '6h'
   memory '8 GB'
@@ -13,18 +12,18 @@ process fastq_dump {
   path sra_path
 
   output:
-  path "*.fastq.gz"
+  path "${sra_path.SimpleName}"
   
   script:
   """
-  fastq-dump --gzip --split-3 ${sra_path.SimpleName}
+  mkdir ${sra_path.SimpleName}
+  fastq-dump --gzip --split-3 ${sra_path.SimpleName} -O ${sra_path.SimpleName} 
   """
 }
 
 process prefetch {
-  debug true
   scratch true
-  containerOptions '--bind /groups/'
+  
   errorStrategy 'finish'
   time '6h'
   memory '8 GB'

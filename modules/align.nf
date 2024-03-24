@@ -1,120 +1,95 @@
 nextflow.enable.dsl=2
 
 process convertBAMToFASTQ {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
-
+  maxRetries 8
+  debug true
   time '6h'
   memory '8 GB'
   cpus 1
   
   input:
-  val sample_dir
+  path sample_dir
   
   output:
-  path "fastq_output", emit: fastqPath
+  path "fastq_output/${sample_dir}"
 
   
   shell:
   '''
   PAIRFLAG=0
   FASTQFLAG=0
-  for file in "!{sample_dir}";do
-    if [[ "$file" == *"_2"* ]];then
+  for file in !{sample_dir}/*; do
+    if [[ "$file" == *"_2"* ]]; then
       PAIRFLAG=1
     fi
-    if [[ "$file" == *".fastq" ]];then
+    if [[ "$file" == *".fastq.gz" ]]; then
       FASTQFLAG=1
     fi
   done
-
-  if FASTQFLAG -eq 1; then
-    cp -r !{sample_dir} fastq_output
-  elif [PAIRFLAG -eq 1 && FASTQFLAG -eq 0]; then
-    samtools sort -n !{sample_dir} -o sorted_!{sample_dir}
-    samtools fastq -1 fastq_output/!{sample_dir.simpleName}_1.fastq.gz -2 fastq_output/!{sample_dir.simpleName}_2.fastq.gz !{sample_dir}
-  elif [PAIRFLAG -eq 0 && FASTQFLAG -eq 0]; then
-    samtools sort -n !{sample_dir} -o sorted_!{sample_dir}
-    samtools fastq -0 fastq_output/!{sample_dir.simpleName}.fastq.gz !{sample_dir}
+  mkdir -p fastq_output/!{sample_dir}
+  if [[ $FASTQFLAG -eq 1 ]]; then
+    cp !{sample_dir}/*.gz fastq_output/!{sample_dir}
+  elif [[ $PAIRFLAG -eq 1 && $FASTQFLAG -eq 0 ]]; then
+    samtools sort -n !{sample_dir}/!{sample_dir}_1.bam -o sorted_!{sample_dir}_1.bam
+    samtools sort -n !{sample_dir}/!{sample_dir}_2.bam -o sorted_!{sample_dir}_2.bam
+    samtools fastq -1 fastq_output/!{sample_dir.baseName}_1.fastq.gz -2 fastq_output/!{sample_dir.baseName}_2.fastq.gz !{sample_dir}.bam
+  elif [[ $PAIRFLAG -eq 0 && $FASTQFLAG -eq 0 ]]; then
+    samtools sort -n !{sample_dir}/!{sample_dir}.fastq.gz -o sorted_!{sample_dir}.fastq.gz
+    samtools fastq -0 fastq_output/!{sample_dir.baseName}.fastq.gz !{sample_dir}/!{sample_dir}.fastq.gz
   fi
   '''
 }
 
-process fastqcQualityControl {
-  containerOptions "--bind ${params.bindFolder}"
-  publishDir "${params.outDir}/fastqc/", mode: 'copy'
-  errorStrategy 'retry'
-  maxRetries 16
 
+process fastqcQualityControl {
+  publishDir "${params.out_dir}/${sample_dir.SimpleName}", mode: 'move'
+  errorStrategy 'retry'
+  maxRetries 86
   time '6h'
   memory '8 GB'
   cpus 1
 
   input:
-  val fastqDir
-  val sampleName
+  path sample_dir
 
   output:
-  file "${sampleName}/*_fastqc.zip"
+  file "${sample_dir}/*.zip"
 
 
   shell:
   '''
-  mkdir !{sampleName}
-
-  for file in !{fastqDir}/*; do
-    fastqc ${file} -o !{sampleName} --noextract
+  for FILE in !{sample_dir}/*.fastq.gz; do
+    fastqc $FILE -o !{sample_dir} --noextract
   done
   '''
 }
 
 process alignWithSTAR {
-  containerOptions "--bind ${params.bindFolder}"
-  publishDir "${params.outDir}/star/", mode: 'copy', pattern: "*/*.{gz}"
+  
+  publishDir "${params.out_dir}/star/", mode: 'move', pattern: "*/*.{gz}"
   errorStrategy 'retry'
-  maxRetries 16
-
+  maxRetries 8
+  debug true
   time '6h'
-  memory '8 GB'
+  memory '48 GB'
   cpus 4
 
   input:
-  path sampleDir
-  val sampleName
+  path sample_dir
 
   output:
-  path "*/*_Aligned.out.bam", emit: bamFile
-  path "*/*.gz"
-  val sampleName, emit: sampleName
-
+  path "${sample_dir}.bam", emit: bam_file
+  path "*.gz"
 
   shell:
   '''
   # Get path of the first file in the input directory
-  firstFile=$(ls -1 "!{sampleDir}" | sort | head -n 1)
-
-  # Extract sample name from the file path
-  IFS='/' read -r -a directories <<< "${firstFile}"
-  fileName="${directories[-1]}"
-
-  # Remove .gz extension from the file name
-  sampleName=${fileName%".gz"}
-
-  # Remove the fastq extension from the file name
-  extension=$(awk -F '.' '{print $NF}' <<< "$sampleName")
-  sampleName=${sampleName%".$extension"}
-
-  # For paired end, remove _1 and _2 suffix from the sample name
-  if [[ $sampleName == *_1 || $sampleName == *_2 ]]; then
-    sampleName="${sampleName%??}"
-  fi
-
-  # Create output directory
-  mkdir !{sampleName}
+  firstFile=$(ls -1 "!{sample_dir}" | sort | head -n 1)
 
   # Determine allowed number of mismatches based on read length
-  readLength=$(samtools view !{sampleDir}/${firstFile} |head -n1 |awk '{print $10}'|tr -d "\\n" |wc -m)
+  readLength=$(samtools view !{sample_dir}/${firstFile} |head -n1 |awk '{print $10}'|tr -d "\\n" |wc -m)
 
   if [ $readLength -ge 90 ]; then
     numMism=4
@@ -125,16 +100,16 @@ process alignWithSTAR {
   fi
 
   # Set different --readFilesIn values for paired and single end
-  if [[ -f !{sampleDir}/${sampleName}_2.fastq.gz ]]; then
+  if [[ -f !{sample_dir}/!{sample_dir}_2.fastq.gz ]]; then
      let numMism=$numMism*2
-     readFilesInArgument="--readFilesIn !{sampleDir}/${sampleName}_1.fastq.gz !{sampleDir}/${sampleName}_2.fastq.gz"
+     readFilesInArgument="--readFilesIn !{sample_dir}/!{sample_dir}_1.fastq.gz !{sample_dir}/!{sample_dir}_2.fastq.gz"
   else
-     readFilesInArgument="--readFilesIn !{sampleDir}/${sampleName}.fastq.gz"
+     readFilesInArgument="--readFilesIn !{sample_dir}/!{sample_dir}.fastq.gz"
   fi
 
   # Run the STAR command
   STAR --runThreadN 8 \
-  --outFileNamePrefix ${sampleName}/${sampleName}_ \
+  --outFileNamePrefix !{sample_dir} \
   --outSAMtype BAM Unsorted \
   --genomeDir !{params.refDir} \
   --genomeLoad NoSharedMemory \
@@ -146,41 +121,40 @@ process alignWithSTAR {
   --readFilesCommand zcat \
   ${readFilesInArgument}
 
+  mv !{sample_dir}Aligned.out.bam !{sample_dir}.bam
+
   # Gzip all output files
-  gzip ${sampleName}/*.tab
-  gzip ${sampleName}/*.out
+  gzip *.tab
+  gzip *.out
 '''
 }
 
 process sortBAM {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '8 GB'
   cpus 1
 
   input:
-  path sample_dir
-  val sampleName
+  path sample_bam
 
   output:
-  path "${sampleName}.sorted.bam", emit: bamFile
-  val sampleName, emit: sampleName
-
+  path "${sample_bam.SimpleName}.sorted.bam", emit: bam_file
   
   script:
   """
-  samtools sort ${sample_dir} -o ${sampleName}.sorted.bam
+  samtools sort ${sample_bam} -o ${sample_bam.SimpleName}.sorted.bam
   """
 }
 
 process markDuplicates {
-  containerOptions "--bind ${params.bindFolder}"
-  publishDir "${params.outDir}/mark_duplicates/", mode: 'copy', pattern: "*/*.{gz}"
+  
+  publishDir "${params.out_dir}/mark_duplicates/", mode: 'move', pattern: "*/*.{gz}"
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '12 GB'
@@ -188,122 +162,111 @@ process markDuplicates {
 
   input:
   path bam_file
-  val sampleName
 
   output:
-  path "${sampleName}/${sampleName}.duplicates.bam", emit: bamFile
-  path "${sampleName}/${sampleName}_duplicates.txt.gz"
-  val sampleName, emit: sampleName
-
+  path "${bam_file.SimpleName}.duplicates.bam", emit: bamFile
+  path "${bam_file.SimpleName}_duplicates.txt.gz"
 
   script:
   """
-  mkdir ${sampleName}
-
   java -Xmx10g -jar /usr/bin/picard.jar MarkDuplicates \
       I=${bam_file} \
-      O=${sampleName}/${sampleName}.duplicates.bam \
-      M=${sampleName}/${sampleName}_duplicates.txt
+      O=${bam_file.SimpleName}.duplicates.bam \
+      M=${bam_file.SimpleName}_duplicates.txt
 
-  gzip ${sampleName}/${sampleName}_duplicates.txt
+  gzip ${bam_file.SimpleName}_duplicates.txt
   """
 }
 
 process QCwithRNASeqMetrics {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '12 GB'
   cpus 1
 
-  publishDir "${params.outDir}/rna_seq_metrics", mode: 'copy'
+  publishDir "${params.out_dir}/rna_seq_metrics", mode: 'move'
 
   input:
-  path sample_dir
-  val sampleName
+  path bam_file
 
   output:
-  path "${sampleName}/${sampleName}_rnaseqmetrics.gz"
-  path "${sampleName}/${sampleName}.chart.pdf.gz"
-  val sampleName
+  path "${bam_file.SimpleName}_rnaseqmetrics.gz"
+  path "${bam_file.SimpleName}.chart.pdf.gz"
 
   
   script:
   """
-  mkdir ${sampleName}
-
   java -Xmx10g -jar /usr/bin/picard.jar CollectRnaSeqMetrics \
-  I=${sample_dir} \
-  O=${sampleName}/${sampleName}_rnaseqmetrics \
-  CHART_OUTPUT=${sampleName}/${sampleName}.chart.pdf \
+  I=${bam_file} \
+  O=${bam_file.SimpleName}_rnaseqmetrics \
+  CHART_OUTPUT=${bam_file.SimpleName}.chart.pdf \
   REF_FLAT=${params.refFlat} \
   STRAND=NONE \
   RIBOSOMAL_INTERVALS=${params.ribosomalIntervalList}
 
-  gzip ${sampleName}/*
+  gzip ${bam_file.SimpleName}.chart.pdf
+  gzip ${bam_file.SimpleName}_rnaseqmetrics
   """
 }
 
 process QCwithMultipleMetrics {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '12 GB'
   cpus 1
 
-  publishDir "${params.outDir}/multiple_metrics", mode: 'copy'
+  publishDir "${params.out_dir}/multiple_metrics", mode: 'move'
 
   input:
-  path sample_dir
-  val sampleName
+  path bam_file
 
   output:
-  path "${sampleName}/*"
+  path "${bam_file.SimpleName}/multiple_metrics*"
 
   
   script:
   """
-  mkdir ${sampleName}
-  
-  java -Xmx10g -jar /usr/bin/picard.jar CollectMultipleMetrics I=${sample_dir} \
-  O=${sampleName}/multiple_metrics \
+  mkdir ${bam_file.SimpleName}
+  java -Xmx10g -jar /usr/bin/picard.jar CollectMultipleMetrics I=${bam_file} \
+  O=${bam_file.SimpleName}/multiple_metrics \
   R=${params.referenceGenome} \
   PROGRAM=CollectAlignmentSummaryMetrics \
   PROGRAM=QualityScoreDistribution \
   PROGRAM=MeanQualityByCycle \
   PROGRAM=CollectInsertSizeMetrics 
 
-  gzip ${sampleName}/*
+  gzip ${bam_file.SimpleName}/*
   """
 }
 
 process identifyAlternativeSplicingSitesrMATS {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.outDir}/rmats", mode: 'copy'
+  publishDir "${params.out_dir}/rmats", mode: 'move'
 
   input:
-  path sample_dir
-  val sampleName
+  path bam_file
   
   output:
-  path "${sampleName}/*.txt.gz"
+  path "${bam_file.SimpleName}/*.txt.gz"
 
   
   shell:
   '''
   # 1. Check if the BAM file is derived from single or paired end reads
-  numFASTQFiles=$(samtools view -H !{sample_dir} | \
+  numFASTQFiles=$(samtools view -H !{bam_file} | \
   grep "@PG" | \
   tr ' ' '\n' | \
   grep -oE '(.fq.gz|.fastq.gz|.fq|.fastq)($)' | \
@@ -320,82 +283,80 @@ process identifyAlternativeSplicingSitesrMATS {
   fi
 
   # 2. Check the read length
-  readLength=$(samtools view !{sample_dir} |head -n1 |awk '{print $10}'|tr -d "\\n" |wc -m)
+  readLength=$(samtools view !{bam_file} |head -n1 |awk '{print $10}'|tr -d "\\n" |wc -m)
 
   # 3. Create config file
-  echo !{sample_dir} > config.txt
+  echo !{bam_file} > config.txt
 
   # 4. Run rMATS command
-  python /usr/bin/rmats_turbo_v4_1_2/rmats.py --b1 config.txt \
+  python /opt/rmats_turbo_v4_1_2/rmats.py --b1 config.txt \
   --gtf !{params.gtfAnnotationFile} \
   --readLength ${readLength} \
-  --od !{sampleName} \
+  --od !{bam_file.SimpleName} \
   --tmp rmats_tmp \
   --task both \
   -t ${end}  \
   --statoff
 
   # 5. Gzip all output files
-  gzip !{sampleName}/*.txt
+  gzip !{bam_file.SimpleName}/*.txt
   '''
 }
 
 process identifyAlternativeSplicingSitesLeafCutter {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.outDir}/leafcutter", mode: 'copy'
+  publishDir "${params.out_dir}/leafcutter", mode: 'move'
 
   input:
-  path sample_dir
-  val sampleName
+  path bam_file
   
   output:
-  path "${sampleName}/*.junc.gz"
+  path "${bam_file.SimpleName}/*.junc.gz"
 
   
   shell:
   '''
   # 1. Index BAM file
-  samtools index !{sample_dir}
+  samtools index !{bam_file}
 
   # 2. Run regtools command
-  mkdir !{sampleName}
-  regtools junctions extract -s XS -a 8 -m 50 -M 500000 !{sample_dir} -o !{sampleName}/!{sampleName}.junc 
+  mkdir !{bam_file.SimpleName}
+  regtools junctions extract -s XS -a 8 -m 50 -M 500000 !{bam_file} -o !{bam_file.SimpleName}/!{bam_file.SimpleName}.junc 
 
   # 3. Gzip the resulting junctions file
-  gzip !{sampleName}/!{sampleName}.junc
+  gzip !{bam_file.SimpleName}/!{bam_file.SimpleName}.junc
   '''
 }
 
 process convertBAMToCRAM {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '6h'
   memory '10 GB'
   cpus 1
 
-  publishDir "${params.outDir}/cram", mode: 'copy'
+  publishDir "${params.out_dir}/cram", mode: 'move'
 
   input:
-  path sample_dir
-  val sampleName
+  path bam_file
   
   output:
-  path "${sampleName}/${sampleName}.cram"
+  path "${bam_file.SimpleName}"
 
   
   script:
   """
-  mkdir ${sampleName}
-  samtools view -T ${params.referenceGenome} -C -o ${sampleName}/${sampleName}.cram ${sample_dir}
+  mkdir ${bam_file.SimpleName}
+  samtools view -T ${params.referenceGenome} -C -o ${bam_file.SimpleName}/${bam_file.SimpleName}.cram ${bam_file}
   """
 }
 
@@ -455,9 +416,9 @@ def checkIfSampleIsProcessed(String folderName, String sampleName) {
 }
 
 process removeWorkDirs {
-  containerOptions "--bind ${params.bindFolder}"
+  
   errorStrategy 'retry'
-  maxRetries 999
+  maxRetries 8
 
   time '1h'
   memory '1 GB'
@@ -505,8 +466,8 @@ workflow {
     sampleNamesChannel = Channel.of(sampleNamesArray)
 
     // Remove samples from the channels that are already in the output folder
-    filteredPathsChannel = sample_dirsChannel.filter { !checkIfSampleIsProcessed(params.outDir, it) }
-    filteredNamesChannel = sampleNamesChannel.filter { !checkIfSampleIsProcessed(params.outDir, it) }
+    filteredPathsChannel = sample_dirsChannel.filter { !checkIfSampleIsProcessed(params.out_dir, it) }
+    filteredNamesChannel = sampleNamesChannel.filter { !checkIfSampleIsProcessed(params.out_dir, it) }
 
     // Run pipeline
     convertBAMToFASTQ(filteredPathsChannel, filteredNamesChannel)
