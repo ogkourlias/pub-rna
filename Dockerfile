@@ -81,7 +81,7 @@ RUN pip install pytabix==0.1 \
 
 # Non-apt Tools
 RUN cd /tmp/init \
-    && wget --output-document sratoolkit.tar.gz https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz \
+    && wget --output-document sratoolkit.tar.gz https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/3.0.10/sratoolkit.3.0.10-ubuntu64.tar.gz \
     && tar -vxzf sratoolkit.tar.gz \
     && mv sratoolkit.3.0.10-ubuntu64 /opt \
     && rm sratoolkit.tar.gz
@@ -144,6 +144,11 @@ RUN cd /tmp/init \
     && make \
     && make install
 
+# Plink 2.0 Install
+RUN cd /tmp/init \
+    && wget -O plink2.zip https://s3.amazonaws.com/plink2-assets/plink2_linux_avx2_20240318.zip \
+    && unzip plink2.zip -d /opt
+
 ENV PATH="${PATH}:/opt/sratoolkit.3.0.10-ubuntu64/bin"
 ENV PATH="${PATH}:/opt/rmats_turbo_v4_1_2/"
 ENV PATH="${PATH}:/opt/STAR/bin"
@@ -154,8 +159,8 @@ ENV PATH="${PATH}:/opt/gatk-4.4.0.0"
 ENV PATH="${PATH}:/opt/htslib-1.18/bin"
 ENV PATH="${PATH}:/opt/"
 
-
 ################## CLEANUP ######################
+
 # Build files cleanup
 RUN cd /app \
     && rm -rf /tmp/init
