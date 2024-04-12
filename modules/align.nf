@@ -1,10 +1,8 @@
 nextflow.enable.dsl=2
 
 process convertBAMToFASTQ {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-  debug true
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
@@ -44,9 +42,9 @@ process convertBAMToFASTQ {
 
 
 process fastqcQualityControl {
-  publishDir "${params.out_dir}/${sample_dir.SimpleName}", mode: 'move'
-  errorStrategy 'retry'
-  maxRetries 86
+  publishDir "${params.out_dir}/${sample_dir}/fastqc", mode: 'move'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
@@ -56,7 +54,7 @@ process fastqcQualityControl {
 
   output:
   file "${sample_dir}/*.zip"
-
+  val task.workDir, emit: work_dir
 
   shell:
   '''
@@ -68,10 +66,9 @@ process fastqcQualityControl {
 
 process alignWithSTAR {
   
-  publishDir "${params.out_dir}/star/", mode: 'move', pattern: "*/*.{gz}"
-  errorStrategy 'retry'
-  maxRetries 8
-  debug true
+  publishDir "${params.out_dir}/${sample_dir}/star/", mode: 'move', pattern: "*/*.{gz}"
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '48 GB'
   cpus 4
@@ -82,6 +79,7 @@ process alignWithSTAR {
   output:
   path "${sample_dir}.bam", emit: bam_file
   path "*.gz"
+  val task.workDir, emit: work_dir
 
   shell:
   '''
@@ -108,7 +106,7 @@ process alignWithSTAR {
   fi
 
   # Run the STAR command
-  STAR --runThreadN 8 \
+  STAR --runThreadN 4 \
   --outFileNamePrefix !{sample_dir} \
   --outSAMtype BAM Unsorted \
   --genomeDir !{params.refDir} \
@@ -130,10 +128,8 @@ process alignWithSTAR {
 }
 
 process sortBAM {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
@@ -143,7 +139,8 @@ process sortBAM {
 
   output:
   path "${sample_bam.SimpleName}.sorted.bam", emit: bam_file
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   samtools sort ${sample_bam} -o ${sample_bam.SimpleName}.sorted.bam
@@ -151,11 +148,9 @@ process sortBAM {
 }
 
 process markDuplicates {
-  
-  publishDir "${params.out_dir}/mark_duplicates/", mode: 'move', pattern: "*/*.{gz}"
-  errorStrategy 'retry'
-  maxRetries 8
-
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/mark_duplicates", mode: 'move', pattern: "*/*.{gz}"
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '12 GB'
   cpus 1
@@ -166,6 +161,7 @@ process markDuplicates {
   output:
   path "${bam_file.SimpleName}.duplicates.bam", emit: bamFile
   path "${bam_file.SimpleName}_duplicates.txt.gz"
+  val task.workDir, emit: work_dir
 
   script:
   """
@@ -179,15 +175,13 @@ process markDuplicates {
 }
 
 process QCwithRNASeqMetrics {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '12 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/rna_seq_metrics", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/QCwithRNA", mode: 'move'
 
   input:
   path bam_file
@@ -195,7 +189,7 @@ process QCwithRNASeqMetrics {
   output:
   path "${bam_file.SimpleName}_rnaseqmetrics.gz"
   path "${bam_file.SimpleName}.chart.pdf.gz"
-
+  val task.workDir, emit: work_dir
   
   script:
   """
@@ -213,22 +207,20 @@ process QCwithRNASeqMetrics {
 }
 
 process QCwithMultipleMetrics {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '12 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/multiple_metrics", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/QCwithMulti", mode: 'move'
 
   input:
   path bam_file
 
   output:
   path "${bam_file.SimpleName}/multiple_metrics*"
-
+  val task.workDir, emit: work_dir
   
   script:
   """
@@ -246,22 +238,20 @@ process QCwithMultipleMetrics {
 }
 
 process identifyAlternativeSplicingSitesrMATS {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/rmats", mode: 'move'
-
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/rmats", mode: 'move'
+  
   input:
   path bam_file
   
   output:
   path "${bam_file.SimpleName}/*.txt.gz"
-
+  val task.workDir, emit: work_dir
   
   shell:
   '''
@@ -304,22 +294,20 @@ process identifyAlternativeSplicingSitesrMATS {
 }
 
 process identifyAlternativeSplicingSitesLeafCutter {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/leafcutter", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/leafcutter", mode: 'move'
 
   input:
   path bam_file
   
   output:
   path "${bam_file.SimpleName}/*.junc.gz"
-
+  val task.workDir, emit: work_dir
   
   shell:
   '''
@@ -336,22 +324,20 @@ process identifyAlternativeSplicingSitesLeafCutter {
 }
 
 process convertBAMToCRAM {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '10 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/cram", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/cram", mode: 'move'
 
   input:
   path bam_file
   
   output:
   path "${bam_file.SimpleName}"
-
+  val task.workDir, emit: work_dir
   
   script:
   """
@@ -416,10 +402,8 @@ def checkIfSampleIsProcessed(String folderName, String sampleName) {
 }
 
 process removeWorkDirs {
-  
-  errorStrategy 'retry'
-  maxRetries 8
-
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '1h'
   memory '1 GB'
   cpus 1

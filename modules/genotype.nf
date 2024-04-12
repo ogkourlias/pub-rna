@@ -1,16 +1,15 @@
 nextflow.enable.dsl=2
 
 process cramToBam {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '4 GB'
   cpus 1
-  maxRetries 16
   
   output:
   path "${cram_file.SimpleName}.bam"
+  val task.workDir, emit: work_dir
 
   input:
   path cram_file
@@ -22,16 +21,16 @@ process cramToBam {
 }
 
 process indexBam {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '6 GB'
   cpus 1
-  maxRetries 16
+
   
   output:
-  path "indexBam/${bam_file.SimpleName}.bai"
+  path "indexBam/${bam_file.SimpleName}.bai", emit: index_file
+  val task.workDir, emit: work_dir
 
   input:
   path bam_file
@@ -46,13 +45,11 @@ process indexBam {
 }
 
 process encodeConvert {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '6 GB'
   cpus 1
-  maxRetries 16
   
   input:
   path sample_bam
@@ -61,7 +58,8 @@ process encodeConvert {
   output:
   path "fixed/${sample_bam.SimpleName}.bam", emit: bam_file
   path index_file, emit: index_file
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   mkdir fastqc unzipped fixed
@@ -80,49 +78,45 @@ process encodeConvert {
 }
 
 process splitNCigarReads {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '16h'
-  memory '10 GB'
+  memory '16 GB'
   cpus 1
-  maxRetries 16
 
   input:
   path sample_bam
   path index_file
 
   output:
-  path "split/${sample_bam.SimpleName}-splitreads.bam", emit: bam_file
+  path "split/${sample_bam.SimpleName}.bam", emit: bam_file
   path index_file, emit: index_file
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   mkdir split
-  gatk --java-options "-Xmx6g" SplitNCigarReads \
+  gatk --java-options "-Xmx12g" SplitNCigarReads \
   -R ${params.referenceGenome}\
   -I ${sample_bam} \
-  -O split/${sample_bam.SimpleName}-splitreads.bam \
+  -O split/${sample_bam.SimpleName}.bam \
   """
 }
 
 process AddOrReplaceReadGroups {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '6 GB'
   cpus 1
-  maxRetries 16
 
   input:
   path split_bam
-  path index_file
   
   output:
   path "readgroup/${split_bam.SimpleName}.bam", emit: bam_file
-  path index_file, emit: index_file
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   mkdir readgroup
@@ -139,23 +133,20 @@ process AddOrReplaceReadGroups {
 
 
 process baseRecalibrator {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '16 GB'
   cpus 1
-  maxRetries 16
 
   input:
   path split_bam
-  path index_file
   path vcf_index
   
   output:
   path "recal/${split_bam.SimpleName}.table", emit: table_file
-  path index_file, emit: index_file
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   mkdir recal
@@ -168,23 +159,20 @@ process baseRecalibrator {
 }
 
 process applyBQSR {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '6 GB'
   cpus 1
-  maxRetries 16
 
   input:
   path sample_bam
-  path index_file
   path table_file
 
   output:
   path "bqsr/${sample_bam.SimpleName}.bqsr.bam", emit: bam_file
-  path index_file, emit: index_file
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   mkdir bqsr
@@ -196,47 +184,46 @@ process applyBQSR {
 }
 
 process haplotypeCaller {
-//   scratch true
-  publishDir "${params.out_dir}", mode: 'copy'
- 
-  errorStrategy 'retry'
-  time '16h'
-  memory '12 GB'
-  cpus 4
+  storeDir  "${params.out_dir}/${sample_bam.SimpleName}/gvcf"
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  time '24h'
+  memory '48 GB'
+  cpus 1
 
   input:
   path sample_bam
-  path bam_index
   
   output:
-  path "gvcf/${sample_bam.SimpleName}.gvcf.gz"
-  
+  file "gvcf/${sample_bam.SimpleName}.gvcf.gz"
+
   script:
   """
   mkdir gvcf
-  gatk --java-options "-Xmx10g" HaplotypeCaller \
+  gatk --java-options "-Xmx42g" HaplotypeCaller \
   -R ${params.referenceGenome}\
   -I ${sample_bam} \
   -O gvcf/${sample_bam.SimpleName}.gvcf.gz \
-  -ERC GVCF
+  -ERC GVCF \
+  -L chr1 -L chr2 -L chr3 -L chr4 -L chr5 -L chr6 -L chr7 -L chr8 -L chr9 -L chr10 -L chr11 \
+  -L chr12 -L chr13 -L chr14 -L chr15 -L chr16 -L chr17 -L chr18 -L chr19 -L chr20 -L chr21 -L chr22
   """
 }
 
 process indexGvcf {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
-  maxRetries 16
 
   input:
   path gvcf_file
   
   output:
   path "${gvcf_file.SimpleName}.gvcf.gz.tbi"
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   gatk --java-options "-Xmx6g" IndexFeatureFile \
@@ -247,13 +234,11 @@ process indexGvcf {
 
 
 process indexJointGvcf {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
-  maxRetries 12
 
   input:
   path gvcf_file
@@ -261,6 +246,7 @@ process indexJointGvcf {
   output:
   path "${gvcf_file.SimpleName}.gvcf.gz.tbi", emit: tbi_file
   path "${gvcf_file}", emit: gvcf_file
+  val task.workDir, emit: work_dir
 
   script:
   """
@@ -271,13 +257,11 @@ process indexJointGvcf {
 }
 
 process combineGvcf {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '16h'
   memory '12 GB'
   cpus 1
-  maxRetries 12
 
   input:
   path gvcfs
@@ -287,7 +271,8 @@ process combineGvcf {
   output:
   path "chr${i}.gvcf.gz"
   path "chr${i}.gvcf.gz.tbi"
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   for GVCF in ${gvcfs}
@@ -304,24 +289,22 @@ process combineGvcf {
 }
 
 process jointGenotype {
-//   scratch true
-  publishDir "${params.out_dir}", mode: 'move'
- 
-  errorStrategy 'retry'
-  time '24h'
-  memory '24 GB'
+  publishDir "${params.out_dir}/${gvcf.SimpleName}/vcf", mode: 'move'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  time '72h'
+  memory '64 GB'
   cpus 1
-  maxRetries 18
 
   input:
   path gvcf
   
   output:
   path "${gvcf.SimpleName}.vcf.gz"
-  
+
   script:
   """
-  gatk --java-options "-Xmx20g" GenotypeGVCFs \
+  gatk --java-options "-Xmx58g" GenotypeGVCFs \
   -R ${params.referenceGenome}\
   -V gendb://${gvcf} \
   -O ${gvcf.SimpleName}.vcf.gz
@@ -329,13 +312,11 @@ process jointGenotype {
 }
 
 process chrSplit {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '8 GB'
   cpus 1
-  maxRetries 18
 
   input:
   path gvcf_dir
@@ -343,7 +324,8 @@ process chrSplit {
   
   output:
   path "chr${i}.gvcf.gz"
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   bcftools view ${gvcf_file} --regions chr${i} -o chr${i}.gvcf.gz -Oz
@@ -351,21 +333,20 @@ process chrSplit {
 }
 
 process combineChrGvcf {
-//   scratch true
- 
-  errorStrategy 'retry'
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   publishDir "${chr_dir}", mode: 'move'
   time '16h'
   memory '12 GB'
   cpus 1
-  maxRetries 16
 
   input:
   path chr_dir
   
   output:
   path "combined/combined.vcf.gz"
-  
+  val task.workDir, emit: work_dir
+
   script:
   """
   mkdir combined
@@ -380,21 +361,20 @@ process combineChrGvcf {
   """
 }
 
-process genomicsDBImport {
-//   scratch true
- 
-  errorStrategy 'retry'
-  time '24h'
-  memory '24 GB'
-  cpus 4
-  maxRetries 1
+process genomicsDBImport_copy {
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  time '36h'
+  memory '48 GB'
+  cpus 1
 
   input:
   path gvcfs
   val i
 
   output:
-  path "chr${i}.gdb"
+  path "chr${i}.gdb", emit: gdb_path
+  val task.workDir, emit: work_dir
   
   script:
   """
@@ -405,6 +385,36 @@ process genomicsDBImport {
     echo "\${GVCF%%.*}\t\$GVCF" >> cohort.sample_map
   done
   gatk --java-options "-Xmx20g" GenomicsDBImport \
+  --genomicsdb-workspace-path chr${i}.gdb \
+  --batch-size 200 \
+  --sample-name-map cohort.sample_map \
+  -L chr${i} \
+  --reader-threads 4
+  """
+}
+
+process genomicsDBImport {
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  time '24h'
+  memory '64 GB'
+  cpus 4
+
+  input:
+  path gvcfs
+  val i
+
+  output:
+  path "chr${i}.gdb", emit: gdb_path
+  
+  script:
+  """
+  for GVCF in ${gvcfs}
+  do
+    tabix \$GVCF
+    echo "\${GVCF%%.*}\t\$GVCF" >> cohort.sample_map
+  done
+  gatk --java-options "-Xmx58g" GenomicsDBImport \
   --genomicsdb-workspace-path chr${i}.gdb \
   --batch-size 200 \
   --sample-name-map cohort.sample_map \
