@@ -90,7 +90,7 @@ process splitNCigarReads {
 
   output:
   path "split/${sample_bam.SimpleName}.bam", emit: bam_file
-  path index_file, emit: index_file
+  path "split/${index_file.SimpleName}.bai", emit: index_file
   val task.workDir, emit: work_dir
 
   script:
@@ -289,11 +289,11 @@ process combineGvcf {
 }
 
 process jointGenotype {
-  publishDir "${params.out_dir}/${gvcf.SimpleName}/vcf", mode: 'move'
+  publishDir "${params.out_dir}/genotypes", mode: 'move'
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '72h'
-  memory '64 GB'
+  memory '18 GB'
   cpus 1
 
   input:
@@ -304,7 +304,7 @@ process jointGenotype {
 
   script:
   """
-  gatk --java-options "-Xmx58g" GenotypeGVCFs \
+  gatk --java-options "-Xmx16g" GenotypeGVCFs \
   -R ${params.referenceGenome}\
   -V gendb://${gvcf} \
   -O ${gvcf.SimpleName}.vcf.gz
@@ -397,7 +397,7 @@ process genomicsDBImport {
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '24h'
-  memory '64 GB'
+  memory '18 GB'
   cpus 4
 
   input:
@@ -414,7 +414,7 @@ process genomicsDBImport {
     tabix \$GVCF
     echo "\${GVCF%%.*}\t\$GVCF" >> cohort.sample_map
   done
-  gatk --java-options "-Xmx58g" GenomicsDBImport \
+  gatk --java-options "-Xmx16g" GenomicsDBImport \
   --genomicsdb-workspace-path chr${i}.gdb \
   --batch-size 200 \
   --sample-name-map cohort.sample_map \

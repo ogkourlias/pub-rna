@@ -56,3 +56,10 @@ workflow {
     genomicsDBImport(gvcfs, chrs)
     jointGenotype(genomicsDBImport.output.gdb_path)
     }
+
+    // workflow GenotypeGVCFs{
+    // gvcfs = Channel.fromPath("/scratch/hb-functionalgenomics/projects/public-rna/data/brain-out/*/gvcf/gvcf/*.gvcf.gz").collect()
+    // chrs = Channel.from( 1..22 )
+    // genomicsDBImport(gvcfs, chrs)
+    // jointGenotype(genomicsDBImport.output.gdb_path)
+    // }
