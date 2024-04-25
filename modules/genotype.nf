@@ -53,15 +53,17 @@ process encodeConvert {
   
   input:
   path sample_bam
-  path index_file
 
   output:
   path "fixed/${sample_bam.SimpleName}.bam", emit: bam_file
-  path index_file, emit: index_file
+  path "fixed/${sample_bam.SimpleName}.bai", emit: index_file
   val task.workDir, emit: work_dir
 
   script:
   """
+  gatk --java-options "-Xmx4g" BuildBamIndex \
+  I=${sample_bam} \
+  O=${sample_bam.SimpleName}.bai
   mkdir fastqc unzipped fixed
   fastqc ${sample_bam} --outdir fastqc
   unzip fastqc/*.zip -d unzipped
@@ -74,6 +76,7 @@ process encodeConvert {
   else
       mv ${sample_bam} fixed/${sample_bam.SimpleName}.bam
   fi
+  mv ${sample_bam.SimpleName}.bai fixed/${sample_bam.SimpleName}.bai
   """
 }
 
@@ -195,15 +198,14 @@ process haplotypeCaller {
   path sample_bam
   
   output:
-  file "gvcf/${sample_bam.SimpleName}.gvcf.gz"
+  file "${sample_bam.SimpleName}.gvcf.gz"
 
   script:
   """
-  mkdir gvcf
   gatk --java-options "-Xmx42g" HaplotypeCaller \
   -R ${params.referenceGenome}\
   -I ${sample_bam} \
-  -O gvcf/${sample_bam.SimpleName}.gvcf.gz \
+  -O ${sample_bam.SimpleName}.gvcf.gz \
   -ERC GVCF \
   -L chr1 -L chr2 -L chr3 -L chr4 -L chr5 -L chr6 -L chr7 -L chr8 -L chr9 -L chr10 -L chr11 \
   -L chr12 -L chr13 -L chr14 -L chr15 -L chr16 -L chr17 -L chr18 -L chr19 -L chr20 -L chr21 -L chr22

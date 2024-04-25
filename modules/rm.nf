@@ -36,7 +36,6 @@ process bamRm {
   path QCwithMultipleMetrics_work
   path identifyAlternativeSplicingSitesrMATS_work
   path identifyAlternativeSplicingSitesLeafCutter_work
-  path indexBam_work
   path encodeConvert_work
   path splitNCigarReads_work
 
@@ -53,7 +52,6 @@ process bamRm {
   rm -rf ${QCwithMultipleMetrics_work}/
   rm -rf ${identifyAlternativeSplicingSitesrMATS_work}/
   rm -rf ${identifyAlternativeSplicingSitesLeafCutter_work}/
-  rm -rf ${indexBam_work}/
   rm -rf ${encodeConvert_work}/
   """
 }

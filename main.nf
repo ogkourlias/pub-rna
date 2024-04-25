@@ -25,8 +25,7 @@ workflow {
     identifyAlternativeSplicingSitesLeafCutter(markDuplicates.out.bamFile)
 
     // Genotyping
-    indexBam(markDuplicates.out.bamFile)
-    encodeConvert(markDuplicates.out.bamFile, indexBam.output.index_file)
+    encodeConvert(markDuplicates.out.bamFile)
     splitNCigarReads(encodeConvert.output.bam_file, encodeConvert.output.index_file) 
     // Cleanup checkpoint. BAM no longer needed.
     bamRm(alignWithSTAR.out.work_dir,
@@ -35,7 +34,6 @@ workflow {
     QCwithRNASeqMetrics.out.work_dir,
     QCwithMultipleMetrics.out.work_dir,
     identifyAlternativeSplicingSitesrMATS.out.work_dir,
-    indexBam.out.work_dir,
     identifyAlternativeSplicingSitesLeafCutter.out.work_dir,
     encodeConvert.out.work_dir,
     splitNCigarReads.out.work_dir)

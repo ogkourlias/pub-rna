@@ -42,7 +42,7 @@ process convertBAMToFASTQ {
 
 
 process fastqcQualityControl {
-  publishDir "${params.out_dir}/${sample_dir}/fastqc", mode: 'move'
+  publishDir "${params.out_dir}/${sample_dir}", mode: 'move'
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
@@ -53,20 +53,21 @@ process fastqcQualityControl {
   path sample_dir
 
   output:
-  file "${sample_dir}/*.zip"
+  file "fastqc/*.zip"
   val task.workDir, emit: work_dir
 
   shell:
   '''
+  mkdir fastqc
   for FILE in !{sample_dir}/*.fastq.gz; do
-    fastqc $FILE -o !{sample_dir} --noextract
+    fastqc $FILE --outdir fastqc --5
   done
   '''
 }
 
 process alignWithSTAR {
   
-  publishDir "${params.out_dir}/${sample_dir}/star/", mode: 'move', pattern: "*/*.{gz}"
+  publishDir "${params.out_dir}/${sample_dir}/star", mode: 'move', pattern: "*.{gz}"
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
@@ -148,7 +149,7 @@ process sortBAM {
 }
 
 process markDuplicates {
-  publishDir "${params.out_dir}/${bam_file.SimpleName}/mark_duplicates", mode: 'move', pattern: "*/*.{gz}"
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/mark_duplicates", mode: 'move', pattern: "*.{gz}"
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
@@ -181,7 +182,7 @@ process QCwithRNASeqMetrics {
   memory '12 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}/QCwithRNA", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
 
   input:
   path bam_file
@@ -213,7 +214,7 @@ process QCwithMultipleMetrics {
   memory '12 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}/QCwithMulti", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
 
   input:
   path bam_file
@@ -244,7 +245,7 @@ process identifyAlternativeSplicingSitesrMATS {
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}/rmats", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
   
   input:
   path bam_file
@@ -300,7 +301,7 @@ process identifyAlternativeSplicingSitesLeafCutter {
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}/leafcutter", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
 
   input:
   path bam_file
@@ -330,7 +331,7 @@ process convertBAMToCRAM {
   memory '10 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}/cram", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
 
   input:
   path bam_file
@@ -341,8 +342,8 @@ process convertBAMToCRAM {
   
   script:
   """
-  mkdir ${bam_file.SimpleName}
-  samtools view -T ${params.referenceGenome} -C -o ${bam_file.SimpleName}/${bam_file.SimpleName}.cram ${bam_file}
+  mkdir cram
+  samtools view -T ${params.referenceGenome} -C -o cram/${bam_file.SimpleName}.cram ${bam_file}
   """
 }
 

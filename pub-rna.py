@@ -41,8 +41,10 @@ class CLI(cmd.Cmd):
 
 
     """
-    def do_config(self, line):
+
+    def __init__(self):
         """Loading CSV."""
+        super(CLI, self).__init__()
         with open ("pub-rna.config", "r") as config:
             for line in config:
                 if "csv_file" in line:
@@ -51,7 +53,6 @@ class CLI(cmd.Cmd):
                 if "out_dir" in line:
                     self.output = line.split("\"")[1]
         print(f"Config loaded. \n Output path: {self.output}")
-
     
     def do_tissues(self, line):
         """Print all tissues."""
@@ -64,6 +65,12 @@ class CLI(cmd.Cmd):
                 print(f"Study {study} has not been processed.")
             else:
                 print(f"Study {study} has been processed.")
+
+    def do_stop(self, line):
+        """Stop study(s)."""
+        for study in line.split(" "):
+            os.system(f"tmux kill-session -t {study}")
+            os.system(f"rm -r {study}")
     
     def do_start(self, line):
         """Start all studies."""
@@ -72,15 +79,16 @@ class CLI(cmd.Cmd):
             if not os.path.exists(f"{self.output}/{study}"):
                 print(f"Creating output directory for {study}.")
                 os.mkdir(f"{self.output}/{study}")
-                print(f"Creating {study}.config")
-                with open (f"{abs_wd}/configs/{study}.config", "w") as study_config, open("pub-rna.config", "r") as config:
-                    for line in config:
-                        if "out_dir" in line:
-                            study_config.write(f"\tout_dir = \"{self.output}/{study}\"\n")
-                        if "input_txt" in line:
-                            study_config.write(f"\tinput_txt = \"{abs_wd}/configs/{study}.txt\"\n")
-                        else:
-                            study_config.write(line)
+
+            print(f"Creating {study}.config")
+            with open (f"{abs_wd}/configs/{study}.config", "w") as study_config, open("pub-rna.config", "r") as config:
+                for line in config:
+                    if "out_dir" in line:
+                        study_config.write(f"\tout_dir = \"{self.output}/{study}\"\n")
+                    elif "input_txt" in line:
+                        study_config.write(f"\tinput_txt = \"{abs_wd}/configs/{study}.txt\"\n")
+                    else:
+                        study_config.write(line)
 
                 print(f"Creating sample list for {study}.")
                 with open (f"{abs_wd}/configs/{study}.txt", "w") as sample_list:
@@ -88,9 +96,6 @@ class CLI(cmd.Cmd):
                         if study in self.file.tissues[tissue].studies:
                             for sample in self.file.tissues[tissue].studies[study].samples:
                                 sample_list.write(f"{self.file.tissues[tissue].studies[study].samples[sample].id}\n")
-
-            else:
-                print(f"Study {study} has been processed.")
             
             if not os.path.exists(f"{abs_wd}/{study}"):
                 os.mkdir(f"{abs_wd}/{study}")
@@ -99,8 +104,8 @@ class CLI(cmd.Cmd):
 
 
     
-    def do_samples(self, line):
-        """Print all samples."""
+    def do_view(self, line):
+        """Print samples."""
         ...
     
     def do_output(self, line):
