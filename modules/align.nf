@@ -103,7 +103,11 @@ process alignWithSTAR {
      let numMism=$numMism*2
      readFilesInArgument="--readFilesIn !{sample_dir}/!{sample_dir}_1.fastq.gz !{sample_dir}/!{sample_dir}_2.fastq.gz"
   else
-     readFilesInArgument="--readFilesIn !{sample_dir}/!{sample_dir}.fastq.gz"
+          if [[ -f !{sample_dir}/!{sample_dir}_1.fastq.gz ]]; then
+                  readFilesInArgument="--readFilesIn !{sample_dir}/!{sample_dir}_1.fastq.gz"
+          else
+                  readFilesInArgument="--readFilesIn !{sample_dir}/!{sample_dir}.fastq.gz"
+        fi
   fi
 
   # Run the STAR command
@@ -188,22 +192,21 @@ process QCwithRNASeqMetrics {
   path bam_file
 
   output:
-  path "${bam_file.SimpleName}_rnaseqmetrics.gz"
-  path "${bam_file.SimpleName}.chart.pdf.gz"
+  path "rna_seq_metrics/"
   val task.workDir, emit: work_dir
   
   script:
   """
+  mkdir rna_seq_metrics
   java -Xmx10g -jar /usr/bin/picard.jar CollectRnaSeqMetrics \
   I=${bam_file} \
-  O=${bam_file.SimpleName}_rnaseqmetrics \
-  CHART_OUTPUT=${bam_file.SimpleName}.chart.pdf \
+  O=rna_seq_metrics/${bam_file.SimpleName}_rnaseqmetrics \
+  CHART_OUTPUT=rna_seq_metrics/${bam_file.SimpleName}.chart.pdf \
   REF_FLAT=${params.refFlat} \
   STRAND=NONE \
   RIBOSOMAL_INTERVALS=${params.ribosomalIntervalList}
 
-  gzip ${bam_file.SimpleName}.chart.pdf
-  gzip ${bam_file.SimpleName}_rnaseqmetrics
+  gzip rna_seq_metrics/*
   """
 }
 
@@ -220,21 +223,21 @@ process QCwithMultipleMetrics {
   path bam_file
 
   output:
-  path "${bam_file.SimpleName}/multiple_metrics*"
+  path "multiple_metrics/"
   val task.workDir, emit: work_dir
   
   script:
   """
-  mkdir ${bam_file.SimpleName}
+  mkdir multiple_metrics
   java -Xmx10g -jar /usr/bin/picard.jar CollectMultipleMetrics I=${bam_file} \
-  O=${bam_file.SimpleName}/multiple_metrics \
+  O=multiple_metrics/${bam_file.SimpleName} \
   R=${params.referenceGenome} \
   PROGRAM=CollectAlignmentSummaryMetrics \
   PROGRAM=QualityScoreDistribution \
   PROGRAM=MeanQualityByCycle \
   PROGRAM=CollectInsertSizeMetrics 
 
-  gzip ${bam_file.SimpleName}/*
+  gzip -r multiple_metrics/
   """
 }
 
@@ -245,13 +248,13 @@ process identifyAlternativeSplicingSitesrMATS {
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/rmats", mode: 'move'
   
   input:
   path bam_file
   
   output:
-  path "${bam_file.SimpleName}/*.txt.gz"
+  path "*.txt.gz"
   val task.workDir, emit: work_dir
   
   shell:
@@ -283,14 +286,14 @@ process identifyAlternativeSplicingSitesrMATS {
   python /opt/rmats_turbo_v4_1_2/rmats.py --b1 config.txt \
   --gtf !{params.gtfAnnotationFile} \
   --readLength ${readLength} \
-  --od !{bam_file.SimpleName} \
+  --od ./ \
   --tmp rmats_tmp \
   --task both \
   -t ${end}  \
   --statoff
 
   # 5. Gzip all output files
-  gzip !{bam_file.SimpleName}/*.txt
+  gzip ./*.txt
   '''
 }
 
@@ -301,13 +304,13 @@ process identifyAlternativeSplicingSitesLeafCutter {
   memory '8 GB'
   cpus 1
 
-  publishDir "${params.out_dir}/${bam_file.SimpleName}", mode: 'move'
+  publishDir "${params.out_dir}/${bam_file.SimpleName}/leafcutter", mode: 'move'
 
   input:
   path bam_file
   
   output:
-  path "${bam_file.SimpleName}/*.junc.gz"
+  path "*.junc.gz"
   val task.workDir, emit: work_dir
   
   shell:
@@ -316,11 +319,10 @@ process identifyAlternativeSplicingSitesLeafCutter {
   samtools index !{bam_file}
 
   # 2. Run regtools command
-  mkdir !{bam_file.SimpleName}
-  regtools junctions extract -s XS -a 8 -m 50 -M 500000 !{bam_file} -o !{bam_file.SimpleName}/!{bam_file.SimpleName}.junc 
+  regtools junctions extract -s XS -a 8 -m 50 -M 500000 !{bam_file} -o !{bam_file.SimpleName}.junc 
 
   # 3. Gzip the resulting junctions file
-  gzip !{bam_file.SimpleName}/!{bam_file.SimpleName}.junc
+  gzip !{bam_file.SimpleName}.junc
   '''
 }
 

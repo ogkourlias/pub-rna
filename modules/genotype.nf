@@ -192,7 +192,7 @@ process haplotypeCaller {
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '24h'
   memory '48 GB'
-  cpus 1
+  cpus 4
 
   input:
   path sample_bam
