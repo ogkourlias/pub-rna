@@ -42,6 +42,7 @@ RUN apt-get update -y \
         libgsl-dev=2.7.1+dfsg-3ubuntu0.23.04.1 \
         liblapack-dev=3.11.0-2 \
         zlib1g-dev=1:1.2.13.dfsg-1ubuntu4 \
+        libatlas-base-dev \
         # Languages.
         # Java
         default-jre=2:1.17-74 \
@@ -65,11 +66,15 @@ RUN apt-get update -y \
         # Tools
         fastqc=0.11.9+dfsg-6 \
         samtools=1.16.1-1 \
+        bedtools \
         # Other
         ca-certificates=20230311ubuntu0.23.04.1 \
     && apt-get clean \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
+
+# R packages
+RUN R -e "install.packages(c('bigstatsr', 'bigparallelr', 'bigsparser', 'bigreadr', 'bigutilsr', 'runonce', 'roptim', 'bigreadr', 'bigsnpr', 'dplyr', 'ggplot2', 'data.table', 'optparse', 'patchwork', 'stringr', 'rmarkdown', 'Cairo', 'igraph'))"  
 
 # Lang packages
 RUN pip install pytabix==0.1 \
@@ -146,7 +151,7 @@ RUN cd /tmp/init \
 
 # Plink 2.0 Install
 RUN cd /tmp/init \
-    && wget -O plink2.zip https://s3.amazonaws.com/plink2-assets/plink2_linux_avx2_20240318.zip \
+    && wget -O plink2.zip https://s3.amazonaws.com/plink2-assets/alpha5/plink2_linux_avx2_20240526.zip \
     && unzip plink2.zip -d /opt
 
 ENV PATH="${PATH}:/opt/sratoolkit.3.0.10-ubuntu64/bin"
