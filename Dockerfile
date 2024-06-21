@@ -126,6 +126,9 @@ RUN wget -O regtools.tar.gz https://github.com/griffithlab/regtools/archive/refs
 # Picard3.1.0
 RUN wget -O /usr/bin/picard.jar https://github.com/broadinstitute/picard/releases/download/3.1.0/picard.jar
 
+# Beagle 5.4
+RUN wget -O /usr/bin/beagle.jar https://faculty.washington.edu/browning/beagle/beagle.27May24.118.jar
+
 # BCFTools 0.1.13 Install
 RUN cd /tmp/init \
     && wget -O bcftools.tar.bz2 https://github.com/samtools/bcftools/releases/download/1.19/bcftools-1.19.tar.bz2 \
