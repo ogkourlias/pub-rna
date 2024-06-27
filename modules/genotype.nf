@@ -291,7 +291,7 @@ process combineGvcf {
 }
 
 process jointGenotype {
-  publishDir "${params.out_dir}/genotypes", mode: 'move'
+  storeDir "${params.out_dir}/genotypes"
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '72h'
@@ -398,8 +398,8 @@ process genomicsDBImport_copy {
 process genomicsDBImport {
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
-  time '24h'
-  memory '18 GB'
+  time '72h'
+  memory '32 GB'
   cpus 4
 
   input:
@@ -416,7 +416,7 @@ process genomicsDBImport {
     tabix \$GVCF
     echo "\${GVCF%%.*}\t\$GVCF" >> cohort.sample_map
   done
-  gatk --java-options "-Xmx16g" GenomicsDBImport \
+  gatk --java-options "-Xmx28g" GenomicsDBImport \
   --genomicsdb-workspace-path chr${i}.gdb \
   --batch-size 200 \
   --sample-name-map cohort.sample_map \

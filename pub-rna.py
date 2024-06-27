@@ -53,7 +53,14 @@ class CLI(cmd.Cmd):
                 if "out_dir" in line:
                     self.output = line.split("\"")[1]
         print(f"Config loaded. \n Output path: {self.output}")
-    
+        self.todo = {}
+        for tissue in self.file.tissues:
+            for study in self.file.tissues[tissue].studies:
+                for sample in self.file.tissues[tissue].studies[study].samples:
+                    if not os.path.exists(f"{self.output}/{study}/{sample}"):
+                        self.todo[f"{tissue} : {study} : {sample}"] = True
+                    self.todo[f"{tissue} : {study} : {sample}"] = False
+
     def do_tissues(self, line):
         """Print all tissues."""
         print(self.file.tissues.keys())
@@ -102,8 +109,35 @@ class CLI(cmd.Cmd):
 
             os.system(f"tmux new -d -s {study} -c {abs_wd}/{study}; tmux send-keys -t {study} \'ml Java && ../nextflow run ../main.nf -c {abs_wd}/configs/{study}.config\' Enter")
 
+    def do_qc(self, line):
+        """Start all studies."""
+        abs_wd = os.path.abspath("../pub-rna/")
+        for study in line.split(" "):
+            if not os.path.exists(f"{self.output}/{study}/QC"):
+                print(f"Creating output directory for {study}/QC.")
+                os.mkdir(f"{self.output}/{study}/QC")
 
-    
+            print(f"Creating {study}.config")
+            with open (f"{abs_wd}/qc_configs/{study}.config", "w") as study_config, open("qc.config", "r") as config:
+                for line in config:
+                    if "outDir" in line:
+                        study_config.write(f"\toutDir = \"{self.output}/{study}/QC\"\n")
+                    elif "inputDir" in line:
+                        study_config.write(f"\tinputDir = \"{self.output}/{study}/genotypes\"\n")
+                    else:
+                        study_config.write(line)
+            
+            if not os.path.exists(f"{abs_wd}/qc_{study}"):
+                os.mkdir(f"{abs_wd}/qc_{study}")
+            os.system(f"tmux new -d -s qc_{study} -c {abs_wd}/qc_{study}; tmux send-keys -t qc_{study} \'ml Java && ../nextflow run ../modules/qc.nf -c {abs_wd}/qc_configs/{study}.config\' Enter")
+
+
+    def do_todo(self, line):
+        """Print all unfinished samples."""
+        for sample in self.todo:
+            if not self.todo[sample]:
+                print(sample)
+                
     def do_view(self, line):
         """Print samples."""
         ...
