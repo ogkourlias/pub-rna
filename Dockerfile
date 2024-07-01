@@ -45,7 +45,7 @@ RUN apt-get update -y \
         libatlas-base-dev \
         # Languages.
         # Java
-        default-jre=2:1.17-74 \
+        openjdk-8-jre \
         # C++
         g++=4:12.2.0-3ubuntu1 \
         # Python
@@ -74,7 +74,7 @@ RUN apt-get update -y \
     && rm -rf /var/lib/apt/lists/*
 
 # R packages
-RUN R -e "install.packages(c('bigstatsr', 'bigparallelr', 'bigsparser', 'bigreadr', 'bigutilsr', 'runonce', 'roptim', 'bigreadr', 'bigsnpr', 'dplyr', 'ggplot2', 'data.table', 'optparse', 'patchwork', 'stringr', 'rmarkdown', 'Cairo', 'igraph'))"  
+RUN R -e "install.packages(c('bigstatsr', 'bigparallelr', 'bigsparser', 'bigreadr', 'bigutilsr', 'runonce', 'roptim', 'bigreadr', 'bigsnpr', 'dplyr', 'ggplot2', 'data.table', 'optparse', 'patchwork', 'stringr', 'rmarkdown', 'Cairo', 'igraph', 'edgeR'))"  
 
 # Lang packages
 RUN pip install pytabix==0.1 \
