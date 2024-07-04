@@ -45,7 +45,7 @@ RUN apt-get update -y \
         libatlas-base-dev \
         # Languages.
         # Java
-        openjdk-8-jre \
+        openjdk-21-jre-headless \
         # C++
         g++=4:12.2.0-3ubuntu1 \
         # Python
