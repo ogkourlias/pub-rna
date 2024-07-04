@@ -158,87 +158,104 @@ process crossmap{
 process sort_bed{
 
     input:
-    set val(study_name), file(study_name_bed), file(study_name_bim), file(study_name_fam) from ( skip_crossmap ? bfile_ch : crossmapped)
+    path bed
+    path bim
+    path fam
 
     output:
     tuple file("sorted.bed"), file("sorted.bim"), file("sorted.fam") into sorted_genotypes_hg38_ch
 
     script:
     """
-    plink2 --bfile ${study_name_bed.simpleName} --make-bed --output-chr MT --out sorted
+    plink2 --bfile ${bed.simpleName} --make-bed --output-chr MT --out sorted
     """
 }
 
 process split_by_chr{
-
     publishDir "${params.outdir}/preimpute/", mode: 'copy',
-        saveAs: {filename -> if (filename.indexOf(".vcf.gz") > 0) filename else null }
 
     input:
-    tuple file(study_name_bed), file(study_name_bim), file(study_name_fam) from sorted_genotypes_hg38_ch
-    each chr from Channel.from(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22)
+    path bed
+    path bim
+    path fam
+    val chr
 
     output:
-    tuple val(chr), path("chr_${chr}_sorted.bed"), path("chr_${chr}_sorted.bim"), path("chr_${chr}_sorted.fam") into sorted_split_genotypes_hg38_ch
+    path "${chr}.sorted.bed"
+    path "${chr}.sorted.bim"
+    path "${chr}.sorted.fam"
+    val chr
 
     script:
     """
-    plink2 --bfile ${study_name_bed.baseName} --chr ${chr} --make-bed --out chr_${chr}_sorted
+    plink2 --bfile ${bed.SimpleName} --chr ${chr} --make-bed --out ${chr}.sorted
     """
 }
 
 process harmonize_hg38{
 
     input:
-    tuple val(chr), path(study_name_bed), path(study_name_bim), path(study_name_fam) from sorted_split_genotypes_hg38_ch
-    tuple file(vcf_file), file(vcf_file_index) from ref_panel_harmonise_genotypes_hg38.collect()
+    path bed
+    path bim
+    path fam
+    val chr
+
 
     output:
-    tuple val(chr), file("harmonised.bed"), file("harmonised.bim"), file("harmonised.fam") into harmonised_split_genotypes_hg38_ch
+    path "${bed.SimpleName}.harmonised.bed", emit: harmonised_bed
+    path "${bed.SimpleName}.harmonised.bim", emit: harmonised_bim
+    path "${bed.SimpleName}.harmonised.fam", emit: harmonised_fam
+    val chr
 
     script:
     """
     java -Xmx25g -jar /usr/bin/GenotypeHarmonizer.jar\
-     --input ${study_name_bed.baseName}\
+     --input ${bed.baseName}\
      --inputType PLINK_BED\
-     --ref ${vcf_file.simpleName}\
+     --ref ${params.harm_ref_vcf}\
      --refType VCF\
      --update-id\
-     --output harmonised
+     --output ${bed.SimpleName}.harmonised
     """
 }
 
 process plink_to_vcf{
 
     input:
-    set val(chr), file(study_name_bed), file(study_name_bim), file(study_name_fam) from harmonised_split_genotypes_hg38_ch
+    path bed
+    path bim
+    path fam
+    val chr
 
     output:
-    tuple val(chr), file("chr${chr}_harmonised_hg38.vcf") into harmonized_split_hg38_vcf_ch
+    path "${bed.SimpleName}.vcf"
+    val chr
 
     script:
     """
-    plink2 --bfile ${study_name_bed.simpleName} --recode vcf-iid --chr 1-22 --out chr${chr}_harmonised_hg38
+    plink2 --bfile ${bed.simpleName} --recode vcf-iid --chr 1-22 --out ${bed.SimpleName}
     """
 }
 
 process vcf_fixref_hg38{
 
     input:
-    tuple val(chr), file(input_vcf) from harmonized_split_hg38_vcf_ch
-    file fasta from target_ref_ch2.collect()
-    set file(vcf_file), file(vcf_file_index) from ref_panel_fixref_genotypes_hg38.collect()
+    path input_vcf
+    path ref_fa
+    path ref_harm_vcf
+    val chr
 
     output:
-    tuple val(chr), file("chr${chr}_fixref_hg38.vcf.gz") into fixed_to_filter_split
+    path "${input_vcf.SipmleName}.fixref_hg38.vcf.gz"
+    val chr
 
     script:
     """
     bgzip -c ${input_vcf} > ${input_vcf}.gz
     bcftools index ${input_vcf}.gz
 
-    bcftools +fixref ${input_vcf}.gz -- -f ${fasta} -i ${vcf_file} | \
-    bcftools norm --check-ref x -f ${fasta} -Oz -o chr${chr}_fixref_hg38.vcf.gz
+    bcftools +fixref ${input_vcf}.gz -- -f ${params.ref_fa} -i ${params.ref_harm_vcf} | \
+    bcftools norm --check-ref x -f ${params.ref_fa} -Oz -o ${input_vcf.SimpleName}.fixref_hg38.vcf.gz
     """
 }
 
@@ -297,21 +314,22 @@ process vcf_fixref_hg38{
 process eagle_prephasing{
 
     input:
-    tuple val(chromosome), file(vcf) from fixed_to_filter_split
-    file genetic_map from genetic_map_ch.collect()
-    file phasing_reference from phasing_ref_ch.collect()
+    path vcf
+    path genetic_map
+    val chr
 
     output:
-    tuple val(chromosome), file("chr${chromosome}.phased.vcf.gz") into phased_vcf_cf
+    path "${vcf.SimpleName}.phased"
+    val chr
 
     script:
     """
     bcftools index ${vcf}
     eagle --vcfTarget=${vcf} \
-    --vcfRef=chr${chromosome}.bcf \
-    --geneticMapFile=${genetic_map} \
-    --chrom=${chromosome} \
-    --outPrefix=chr${chromosome}.phased \
+    --vcfRef=${params.phasing_dir}/${vcf.SimpleName}.bcf \
+    --geneticMapFile=${params.map_file} \
+    --chrom=${chr} \
+    --outPrefix=${vcf.SimpleName}.phased \
     --numThreads=8
     """
 }
@@ -334,23 +352,37 @@ process eagle_prephasing{
 process minimac_imputation{
 
     input:
-    set val(chromosome), file(vcf) from phased_vcf_cf
-    file imputation_reference from imputation_ref_ch.collect()
+    path vcf
+    val chr
 
     output:
-    tuple val(chromosome), file("chr${chromosome}.dose.vcf.gz") into imputed_vcf_cf
+    path "${vcf.SimpleName}.dose.vcf.gz"
 
-    publishDir "${params.outdir}/postimpute/", mode: 'copy', pattern: "*.vcf.gz", overwrite: true
     script:
     """
-    minimac4 --refHaps chr${chromosome}.m3vcf.gz \
+    minimac4 --refHaps chr${chr}.m3vcf.gz \
     --rsid \
     --haps ${vcf} \
-    --prefix chr${chromosome} \
+    --prefix ${vcf.SimpleName} \
     --format GT,DS,GP \
     --noPhoneHome \
     --ChunkLengthMb 50 \
     --minRatio 0.01
+    """
+}
+
+process filter_r2_maf{
+
+    input:
+    path vcf
+
+    output:
+    path "${vcf.SimpleName}.filtered.dose.vcf.gz"
+
+    publishDir "${params.outdir}/postimpute/", mode: 'move', pattern: "*.vcf.gz", overwrite: true
+    script:
+    """
+    bcftools filter -i 'INFO/R2>=0.3 && INFO/MAF>=0.01' ${vcf} -o ${vcf.SimpleName}.filtered.dose.vcf.gz
     """
 }
 
@@ -429,6 +461,13 @@ process minimac_imputation{
 
 // }
 
-workflow.onComplete {
-    println ( workflow.success ? "Pipeline finished!" : "Something crashed...debug!" )
+workflow {
+    sort_bed("${params.in_dir}/*.bed", "${params.in_dir}/*.bim", "${params.in_dir}/*.fam")
+    chrs = Channel.from( 1..22 )
+    split_by_chr(sort_bed.out.bed, sort_bed.out.bim, sort_bed.out.fam, chrs)
+    harmonize_hg38(split_by_chr.out, params.ref_panel_hg38, split_by_chr.out.chr)
+    plink_to_vcf(harmonize_hg38.harmonised_bed, harmonize_hg38.harmonised_bim, harmonize_hg38.harmonised_fam, harmonize_hg38.out.chrs)
+    vcf_fixref_hg38(plink_to_vcf.out, target_ref_ch, ref_panel_harmonise_genotypes_hg38, plink_to_vcf.out.chrs)
+    eagle_prephasing(vcf_fixref_hg38.out, genetic_map_ch, vcf_fixref_hg38.out.chr)
+    minimac_imputation(eagle_prephasing.out)
 }

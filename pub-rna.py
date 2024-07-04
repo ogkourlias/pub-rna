@@ -43,8 +43,9 @@ class CLI(cmd.Cmd):
     """
 
     def __init__(self):
-        """Loading CSV."""
         super(CLI, self).__init__()
+        """Loading CSV."""
+        self.pipeline_dir = os.path.abspath("../pub-rna/")
         with open ("pub-rna.config", "r") as config:
             for line in config:
                 if "csv_file" in line:
@@ -52,26 +53,30 @@ class CLI(cmd.Cmd):
                     self.file.open_csv()
                 if "out_dir" in line:
                     self.output = line.split("\"")[1]
+                if "work_dir" in line:
+                    self.work_dir = line.split("\"")[1]
         print(f"Config loaded. \n Output path: {self.output}")
+        print(f"Work path: {self.work_dir}")
+
+        # Todo check
         self.todo = {}
         for tissue in self.file.tissues:
-            for study in self.file.tissues[tissue].studies:
-                for sample in self.file.tissues[tissue].studies[study].samples:
-                    if not os.path.exists(f"{self.output}/{study}/{sample}"):
-                        self.todo[f"{tissue} : {study} : {sample}"] = True
-                    self.todo[f"{tissue} : {study} : {sample}"] = False
-
-    def do_tissues(self, line):
-        """Print all tissues."""
-        print(self.file.tissues.keys())
-    
-    def do_studies(self, line):
-        """Print all studies."""
-        for study in line.split(" "):
-            if not os.path.exists(f"{self.output}/{study}"):
-                print(f"Study {study} has not been processed.")
-            else:
-                print(f"Study {study} has been processed.")
+            self.todo[tissue] = []
+            if os.path.exists(f"{self.output}/{tissue}"):
+                print(f"{tissue} exists")
+                for study in self.file.tissues[tissue].studies:
+                    if len(self.file.tissues[tissue].studies[study].samples) >= 30:
+                        if os.path.exists(f"{self.output}/{tissue}/{study}"):
+                            if os.path.exists(f"{self.output}/{tissue}/{study}/genotypes"):
+                                if len(os.listdir(f"{self.output}/{tissue}/{study}/genotypes")) >= 22:
+                                    continue
+                                else:
+                                    self.todo[tissue].append(study)
+                            else:
+                                self.todo[tissue].append(study)
+                            #print(os.listdir(f"{self.output}/{tissue}/{study}"))
+                        else:
+                            self.todo[tissue].append(study)
 
     def do_stop(self, line):
         """Stop study(s)."""
@@ -79,73 +84,139 @@ class CLI(cmd.Cmd):
             os.system(f"tmux kill-session -t {study}")
             os.system(f"rm -r {study}")
     
-    def do_start(self, line):
+    def do_gt(self, line):
         """Start all studies."""
-        abs_wd = os.path.abspath("../pub-rna/")
+        print(f"Creating gt_configs directory at {self.work_dir}/gt_configs")
+        os.makedirs(f"{self.work_dir}/gt_configs", exist_ok=True)
         for study in line.split(" "):
-            if not os.path.exists(f"{self.output}/{study}"):
-                print(f"Creating output directory for {study}.")
-                os.mkdir(f"{self.output}/{study}")
-
-            print(f"Creating {study}.config")
-            with open (f"{abs_wd}/configs/{study}.config", "w") as study_config, open("pub-rna.config", "r") as config:
+            for tissue in self.file.tissues:
+                if study in self.file.tissues[tissue].studies:
+                    study_tissue = tissue
+            
+            # Create output directory
+            print(f"Creating output directory for {study} at {self.output}/{study_tissue}/{study}")
+            os.makedirs(f"{self.output}/{study_tissue}/{study}", exist_ok=True)
+            # Create config file
+            print(f"Creating {study}.config at {self.work_dir}/gt_configs/{study}.config")
+            with open (f"{self.work_dir}/gt_configs/{study}.config", "w") as study_config, open(f"{self.pipeline_dir}/configs/align_gt.config", "r") as config:
                 for line in config:
                     if "out_dir" in line:
-                        study_config.write(f"\tout_dir = \"{self.output}/{study}\"\n")
+                        study_config.write(f"\tout_dir = \"{self.output}/{study_tissue}/{study}\"\n")
                     elif "input_txt" in line:
-                        study_config.write(f"\tinput_txt = \"{abs_wd}/configs/{study}.txt\"\n")
+                        study_config.write(f"\tinput_txt = \"{self.work_dir}/gt_configs/{study}.txt\"\n")
                     else:
                         study_config.write(line)
 
-                print(f"Creating sample list for {study}.")
-                with open (f"{abs_wd}/configs/{study}.txt", "w") as sample_list:
+                print(f"Creating sample list for {study} at {self.work_dir}/gt_configs/{study}.txt")
+                with open (f"{self.work_dir}/gt_configs/{study}.txt", "w") as sample_list:
                     for tissue in self.file.tissues:
                         if study in self.file.tissues[tissue].studies:
                             for sample in self.file.tissues[tissue].studies[study].samples:
                                 sample_list.write(f"{self.file.tissues[tissue].studies[study].samples[sample].id}\n")
-            
-            if not os.path.exists(f"{abs_wd}/{study}"):
-                os.mkdir(f"{abs_wd}/{study}")
 
-            os.system(f"tmux new -d -s {study} -c {abs_wd}/{study}; tmux send-keys -t {study} \'ml Java && ../nextflow run ../main.nf -c {abs_wd}/configs/{study}.config\' Enter")
+            os.makedirs(f"{self.work_dir}/gt/{study}", exist_ok=True)
+            os.system(f"tmux new -d -s gt_{study} -c {self.work_dir}/gt/{study}; tmux send-keys -t gt_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/align_gt.nf -c {self.work_dir}/gt_configs/{study}.config\' Enter")
 
     def do_qc(self, line):
         """Start all studies."""
-        abs_wd = os.path.abspath("../pub-rna/")
+        print(f"Creating qc_configs directory at {self.work_dir}/qc_configs")
+        os.makedirs(f"{self.work_dir}/qc_configs", exist_ok=True)
         for study in line.split(" "):
-            if not os.path.exists(f"{self.output}/{study}/QC"):
-                print(f"Creating output directory for {study}/QC.")
-                os.mkdir(f"{self.output}/{study}/QC")
+            print(f"Creating output directory for {study}/qc. at {self.output}/whole-blood/{study}/qc")
+            os.makedirs(f"{self.output}/whole-blood/{study}/qc", exist_ok=True)
 
             print(f"Creating {study}.config")
-            with open (f"{abs_wd}/qc_configs/{study}.config", "w") as study_config, open("qc.config", "r") as config:
+            with open (f"{self.work_dir}/qc_configs/{study}.config", "w") as study_config, open(f"{self.pipeline_dir}/configs/qc.config", "r") as config:
                 for line in config:
                     if "outDir" in line:
-                        study_config.write(f"\toutDir = \"{self.output}/{study}/QC\"\n")
+                        study_config.write(f"\toutDir = \"{self.output}/whole-blood/{study}/qc\"\n")
                     elif "inputDir" in line:
-                        study_config.write(f"\tinputDir = \"{self.output}/{study}/genotypes\"\n")
+                        study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}/genotypes\"\n")
                     else:
                         study_config.write(line)
-            
-            if not os.path.exists(f"{abs_wd}/qc_{study}"):
-                os.mkdir(f"{abs_wd}/qc_{study}")
-            os.system(f"tmux new -d -s qc_{study} -c {abs_wd}/qc_{study}; tmux send-keys -t qc_{study} \'ml Java && ../nextflow run ../modules/qc.nf -c {abs_wd}/qc_configs/{study}.config\' Enter")
+
+            os.makedirs(f"{self.work_dir}/qc/{study}", exist_ok=True)
+            os.system(f"tmux new -d -s qc_{study} -c {self.work_dir}/qc/{study}; tmux send-keys -t qc_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/qc.nf -c {self.work_dir}/qc_configs/{study}.config\' Enter")
 
 
     def do_todo(self, line):
         """Print all unfinished samples."""
-        for sample in self.todo:
-            if not self.todo[sample]:
-                print(sample)
-                
-    def do_view(self, line):
-        """Print samples."""
-        ...
+        for tissue_input in line.split(" "):
+            if "*" not in tissue_input:
+                print(f"-- {tissue_input} --")
+                [print(f"{study}: {len(self.file.tissues[tissue_input].studies[study].samples)}") for study in self.todo[tissue_input]]
+            else:
+                for tissue in self.file.tissues:
+                    print(f"-- {tissue} --")
+                    [print(f"{study}: {len(self.file.tissues[tissue].studies[study].samples)}") for study in self.todo[tissue]]
+
+    def do_exp(self, line):
+        """Start all studies."""
+        print(f"Creating exp_configs directory at {self.work_dir}/exp_configs")
+        os.makedirs(f"{self.work_dir}/exp_configs", exist_ok=True)
+
+        for study in line.split(" "):
+            os.makedirs(f"{self.output}/whole-blood/{study}/exp", exist_ok=True)
+            print(f"Creating {study}.config at {self.work_dir}/exp_configs/{study}.config")
+            with open (f"{self.work_dir}/exp_configs/{study}.config", "w") as study_config, open(f"{self.pipeline_dir}/configs/exp.config", "r") as config:
+                for line in config:
+                    if "outDir" in line:
+                        study_config.write(f"\toutDir = \"{self.output}/whole-blood/{study}/exp\"\n")
+                    elif "inputDir" in line:
+                        study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}\"\n")
+                    else:
+                        study_config.write(line)
+                    
+            os.makedirs(f"{self.work_dir}/exp/{study}", exist_ok=True)
+            os.system(f"tmux new -d -s exp_{study} -c {self.work_dir}/exp/{study}; tmux send-keys -t exp_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/exp.nf -c {self.work_dir}/exp_configs/{study}.config\' Enter")
+
+    def do_impute(self, line):
+        print(f"Creating impute_configs directory at {self.work_dir}/impute_configs")
+        os.makedirs(f"{self.work_dir}/impute_configs", exist_ok=True)
+        for study in line.split(" "):
+            print(f"Creating impute_configs directory at {self.work_dir}/impute_configs")
+            os.makedirs(f"{self.work_dir}/impute_configs", exist_ok=True)
+            print(f"Creating {study}.config")
+            with open (f"{self.work_dir}/impute_configs/{study}.config", "w") as study_config, open("impute.config", "r") as config:
+                for line in config:
+                    if "out_dir" in line:
+                        study_config.write(f"\toutDir = \"{self.output}/whole-blood/{study}/impute\"\n")
+                    elif "in_dir" in line:
+                        study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}/qc/final\"\n")
+                    else:
+                        study_config.write(line)
+            
+            print(f"Creating work directory for {study} at {self.work_dir}/impute/{study}")
+            os.makedirs(f"{self.work_dir}/impute/{study}", exist_ok=True)
+            os.system(f"tmux new -d -s impute_{study} -c {self.work_dir}/impute/{study}; tmux send-keys -t impute_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/impute.nf -c {self.work_dir}/impute_configs/{study}.config\' Enter")
     
-    def do_output(self, line):
-        """Set output path."""
-        self.output = line
-    
+    def do_check(self, line):
+        with open(f"{self.work_dir}/gt_todo.txt", "w") as gt_todo, open(f"{self.work_dir}/qc_todo.txt", "w") as qc_todo, open(f"{self.work_dir}/exp_todo.txt", "w") as exp_todo, open(f"{self.work_dir}/impute_todo.txt", "w") as impute_todo:
+            for tissue in self.file.tissues:
+                for study in self.file.tissues[tissue].studies:
+                    if len(self.file.tissues[tissue].studies[study].samples) >= 30:
+                        if not os.path.exists(f"{self.output}{tissue}/{study}"):
+                            gt_todo.write(f"{tissue} {study}\n")
+                        else:
+                            if not os.path.exists(f"{self.output}{tissue}/{study}/genotypes"):
+                                gt_todo.write(f"{tissue} {study}\n")
+                            else:
+                                if len(os.listdir(f"{self.output}{tissue}/{study}/genotypes")) < 22:
+                                    gt_todo.write(f"{tissue} {study}\n")
+                                    continue
+                                if not os.path.exists(f"{self.output}/{tissue}/{study}/qc"):
+                                    qc_todo.write(f"{tissue} {study}\n")
+                                else:
+                                    if not os.path.exists(f"{self.output}{tissue}/{study}/qc/final"):
+                                        qc_todo.write(f"{tissue} {study}\n")
+                                        continue
+                                    else:
+                                        if not os.path.exists(f"{self.output}{tissue}/{study}/exp"):
+                                            exp_todo.write(f"{tissue} {study}\n")
+                                        else:
+                                            if not os.path.exists(f"{self.output}{tissue}/{study}/impute"):
+                                                impute_todo.write(f"{tissue} {study}\n")
+
     def do_finished_study(self, line):
         """Print all finished samples."""
         ...
@@ -170,11 +241,11 @@ class File:
             spamreader = csv.reader(csvfile, delimiter=',')
             next(spamreader)
             for row in spamreader:
-                if row[7] not in self.tissues:
-                    self.tissues[row[7]] = Tissue(row[7])
-                    self.tissues[row[7]].add_study(row[5], row[0])
+                if row[7].replace(" ", "-").lower() not in self.tissues:
+                    self.tissues[row[7].replace(" ", "-").replace("/", "-").lower()] = Tissue(row[7])
+                    self.tissues[row[7].replace(" ", "-").replace("/", "-").lower()].add_study(row[5], row[0])
                 else:
-                    self.tissues[row[7]].add_study(row[5], row[0])
+                    self.tissues[row[7].replace(" ", "-").replace("/", "-").lower()].add_study(row[5], row[0])
         
 
 class Tissue(File):

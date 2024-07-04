@@ -386,11 +386,12 @@ process genomicsDBImport_copy {
     bcftools view \$GVCF --regions chr${i} -o \$GVCF.chr${i}.gvcf.gz -Oz
     echo "\${GVCF%%.*}\t\$GVCF" >> cohort.sample_map
   done
-  gatk --java-options "-Xmx20g" GenomicsDBImport \
+  gatk --java-options "-Xmx24g" GenomicsDBImport \
   --genomicsdb-workspace-path chr${i}.gdb \
-  --batch-size 200 \
+  --batch-size 50 \
   --sample-name-map cohort.sample_map \
   -L chr${i} \
+  --genomicsdb-shared-posixfs-optimizations
   --reader-threads 4
   """
 }

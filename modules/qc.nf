@@ -26,7 +26,7 @@ process concatCHRFiles {
     script:
     """
     mkdir -p  tmp_sort
-    for i in {21..22}; do echo "chr\$i.filtered.vcf.gz" >> vcflist.txt; done
+    for i in {1..22}; do echo "chr\$i.filtered.vcf.gz" >> vcflist.txt; done
     bcftools concat -f vcflist.txt -Oz -o "${params.project}.sorted.concat.vcf.gz"
     bcftools stats ${params.project}.sorted.concat.vcf.gz > filtered.stats
     """
@@ -750,6 +750,28 @@ process beagle {
     nthreads=4 \
     gp=true
     plink2 --vcf ${bed.SimpleName}.vcf.gz --make-bed --out ${bed.SimpleName}.beagle
+    """
+}
+
+
+process metrics_merge {
+    storeDir "${params.outDir}/variant_filter"
+    errorStrategy 'retry'
+    maxRetries 2
+
+    time '6h'
+    memory '8 GB'
+    cpus 1
+
+    input:
+    path prefilter_files
+
+    output:
+    path "prefiltered.stats"
+
+    script:
+    """
+    for i in {1..22}; do head -n 20 chr\$i.prefilter.stats >> prefiltered.stats; done
     """
 }
 
