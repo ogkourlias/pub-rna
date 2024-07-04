@@ -74,17 +74,21 @@ def get_insert_metrics(file_path, res_columns, res_values):
         "INSERT_METRICS_WIDTH_OF_99_PERCENT",
     ]
 
-    with gzip.open(file_path, 'r') as insert_metrics:
-        content = insert_metrics.read().decode()
-        data = content.split('\n\n')[1].split('\n')
-        columns = data[1].split('\t')
-        values = data[2].split('\t')
-
-    for i, c in enumerate(columns):
-        
-        if f'INSERT_METRICS_{c}' in included_metrics:
-            res_columns.append(f'INSERT_METRICS_{c}')
-            res_values.append(values[i])       
+    if os.path.exists(f'{file_path}'):
+        with gzip.open(file_path, 'r') as insert_metrics:
+            content = insert_metrics.read().decode()
+            data = content.split('\n\n')[1].split('\n')
+            columns = data[1].split('\t')
+            values = data[2].split('\t')
+        for i, c in enumerate(columns):
+            
+            if f'INSERT_METRICS_{c}' in included_metrics:
+                res_columns.append(f'INSERT_METRICS_{c}')
+                res_values.append(values[i])       
+    else:
+        for i, c in enumerate(included_metrics):
+                res_columns.append(f'{c}')
+                res_values.append(0)    
 
     return res_columns, res_values 
 
@@ -267,7 +271,7 @@ if __name__ == '__main__':
     error_file = open('failed_samples.txt', 'w')
 
     for sample in os.listdir(f'{input_directory}/'):
-        if "QC" not in sample and "genotypes" not in sample and "exp" not in sample:
+        if "QC" not in sample and "genotypes" not in sample and "exp" not in sample and "qc" not in sample:
                 col, val = get_all_metrics(sample, input_directory + '/' + sample)
                 columns = col
                 values.append(val)

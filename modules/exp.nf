@@ -2,8 +2,8 @@ nextflow.enable.dsl=2
 
 process createCovariateMatrix {
   publishDir "${params.outDir}/1_create_covariate_matrix/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -34,8 +34,8 @@ process createCovariateMatrix {
 
 process createGeneCountsMatrix {
   publishDir "${params.outDir}/3_create_gene_counts_matrix/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -59,8 +59,8 @@ process createGeneCountsMatrix {
 
 process geneCountsTMMNormalization {
   publishDir "${params.outDir}/3_gene_counts_tmm_normalization/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -86,8 +86,8 @@ process geneCountsTMMNormalization {
 
 process sampleSelection {
     publishDir "${params.outDir}/4_sample_selection/", mode: 'copy'
-    // maxRetries 2
-    // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+    maxRetries 2
+    errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
     time '12h'
     memory '16 GB'
     cpus 1
@@ -112,8 +112,8 @@ process sampleSelection {
 
 process normalizeCovariateMatrix {
   publishDir "${params.outDir}/2_normalize_covariate_matrix/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -137,8 +137,8 @@ process normalizeCovariateMatrix {
 
 process pcaOutlierFiltering {
   publishDir "${params.outDir}/5_gene_counts_pca_outlier_identification/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '32 GB'
   cpus 1
@@ -186,8 +186,8 @@ process pcaOutlierFiltering {
 
 process quantileNormalization {
   publishDir "${params.outDir}/6_quantile_normalization/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -206,8 +206,8 @@ process quantileNormalization {
 
 process geneForceNormal {
   publishDir "${params.outDir}/7_gene_force_normal/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -226,8 +226,8 @@ process geneForceNormal {
 
 process geneCountsCovariateCorrection {
   publishDir "${params.outDir}/8_covariate_correction/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -265,8 +265,8 @@ process geneCountsCovariateCorrection {
 
 process residualsPCA {
   publishDir "${params.outDir}/9_residuals_pca/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1
@@ -287,8 +287,8 @@ process residualsPCA {
 
 process covariateAndResidualsCorrection {
   publishDir "${params.outDir}/10_final_covariate_correction/", mode: 'copy'
-  // maxRetries 2
-  // errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '12h'
   memory '16 GB'
   cpus 1

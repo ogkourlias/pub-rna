@@ -37,7 +37,7 @@ if __name__ == '__main__':
     #         res_df = df
 
     for sample in os.listdir(f'{input_dir}/'):
-        if "QC" not in sample and "genotypes" not in sample and "exp" not in sample:
+        if "qc" not in sample and "genotypes" not in sample and "exp" not in sample and "QC" not in sample:
             df = pd.read_csv(f'{input_dir}/{sample}/star/{sample}ReadsPerGene.out.tab.gz', sep='\t', header=None)
 
             df = df.iloc[4:]

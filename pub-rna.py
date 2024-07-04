@@ -102,10 +102,11 @@ class CLI(cmd.Cmd):
                 for line in config:
                     if "out_dir" in line:
                         study_config.write(f"\tout_dir = \"{self.output}/{study_tissue}/{study}\"\n")
-                    elif "input_txt" in line:
+                        continue
+                    if "input_txt" in line:
                         study_config.write(f"\tinput_txt = \"{self.work_dir}/gt_configs/{study}.txt\"\n")
-                    else:
-                        study_config.write(line)
+                        continue
+                    study_config.write(line)
 
                 print(f"Creating sample list for {study} at {self.work_dir}/gt_configs/{study}.txt")
                 with open (f"{self.work_dir}/gt_configs/{study}.txt", "w") as sample_list:
@@ -130,10 +131,14 @@ class CLI(cmd.Cmd):
                 for line in config:
                     if "outDir" in line:
                         study_config.write(f"\toutDir = \"{self.output}/whole-blood/{study}/qc\"\n")
-                    elif "inputDir" in line:
+                        continue
+                    if "inputDir" in line:
                         study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}/genotypes\"\n")
-                    else:
-                        study_config.write(line)
+                        continue
+                    if "project" in line:
+                        study_config.write(f"\tproject = \"{study}\"\n")
+                        continue
+                    study_config.write(line)
 
             os.makedirs(f"{self.work_dir}/qc/{study}", exist_ok=True)
             os.system(f"tmux new -d -s qc_{study} -c {self.work_dir}/qc/{study}; tmux send-keys -t qc_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/qc.nf -c {self.work_dir}/qc_configs/{study}.config\' Enter")
@@ -162,10 +167,14 @@ class CLI(cmd.Cmd):
                 for line in config:
                     if "outDir" in line:
                         study_config.write(f"\toutDir = \"{self.output}/whole-blood/{study}/exp\"\n")
-                    elif "inputDir" in line:
+                        continue
+                    if "inputDir" in line:
                         study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}\"\n")
-                    else:
-                        study_config.write(line)
+                        continue
+                    if "cohortName" in line:
+                        study_config.write(f"\tcohortName = \"{study}\"\n")
+                        continue
+                    study_config.write(line)
                     
             os.makedirs(f"{self.work_dir}/exp/{study}", exist_ok=True)
             os.system(f"tmux new -d -s exp_{study} -c {self.work_dir}/exp/{study}; tmux send-keys -t exp_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/exp.nf -c {self.work_dir}/exp_configs/{study}.config\' Enter")
@@ -177,14 +186,18 @@ class CLI(cmd.Cmd):
             print(f"Creating impute_configs directory at {self.work_dir}/impute_configs")
             os.makedirs(f"{self.work_dir}/impute_configs", exist_ok=True)
             print(f"Creating {study}.config")
-            with open (f"{self.work_dir}/impute_configs/{study}.config", "w") as study_config, open("impute.config", "r") as config:
+            with open (f"{self.work_dir}/impute_configs/{study}.config", "w") as study_config, open(f"{self.pipeline_dir}/configs/impute.config", "r") as config:
                 for line in config:
                     if "out_dir" in line:
-                        study_config.write(f"\toutDir = \"{self.output}/whole-blood/{study}/impute\"\n")
-                    elif "in_dir" in line:
-                        study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}/qc/final\"\n")
-                    else:
-                        study_config.write(line)
+                        study_config.write(f"\tout_dir = \"{self.output}/whole-blood/{study}/impute\"\n")
+                        continue
+                    if "in_dir" in line:
+                        study_config.write(f"\tin_dir = \"{self.output}/whole-blood/{study}/qc/final\"\n")
+                        continue
+                    if "cohort_name" in line:
+                        study_config.write(f"\tcohort_name = \"{study}\"\n")
+                        continue
+                    study_config.write(line)
             
             print(f"Creating work directory for {study} at {self.work_dir}/impute/{study}")
             os.makedirs(f"{self.work_dir}/impute/{study}", exist_ok=True)
