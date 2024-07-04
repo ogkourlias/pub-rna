@@ -74,7 +74,9 @@ RUN apt-get update -y \
     && rm -rf /var/lib/apt/lists/*
 
 # R packages
-RUN R -e "install.packages(c('bigstatsr', 'bigparallelr', 'bigsparser', 'bigreadr', 'bigutilsr', 'runonce', 'roptim', 'bigreadr', 'bigsnpr', 'dplyr', 'ggplot2', 'data.table', 'optparse', 'patchwork', 'stringr', 'rmarkdown', 'Cairo', 'igraph', 'edgeR'))"  
+RUN R -e "install.packages(c('bigstatsr', 'bigparallelr', 'bigsparser', 'bigreadr', 'bigutilsr', 'runonce', 'roptim', 'bigreadr', 'bigsnpr', 'dplyr', 'ggplot2', 'data.table', 'optparse', 'patchwork', 'stringr', 'rmarkdown', 'Cairo', 'igraph'))"  
+RUN R -e "install.packages('BiocManager', repos='http://cran.us.r-project.org')"
+RUN R -e "BiocManager::install('edgeR')"
 
 # Lang packages
 RUN pip install pytabix==0.1 \
@@ -82,7 +84,9 @@ RUN pip install pytabix==0.1 \
     argparse==1.4.0 \
     numpy==1.26.4 \
     scipy==1.10.1 \
-    multiqc==1.16
+    multiqc==1.16 \
+    scikit-learn \
+    seaborn    
 
 # Non-apt Tools
 RUN cd /tmp/init \
