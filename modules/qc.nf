@@ -20,15 +20,15 @@ process concatCHRFiles {
     path vcfsPath
 
     output:
-    path "${params.project}.sorted.concat.vcf.gz", emit: sortedVcf
+    path "${params.cohortName}.sorted.concat.vcf.gz", emit: sortedVcf
     path "filtered.stats"
 
     script:
     """
     mkdir -p  tmp_sort
     for i in {1..22}; do echo "chr\$i.filtered.vcf.gz" >> vcflist.txt; done
-    bcftools concat -f vcflist.txt -Oz -o "${params.project}.sorted.concat.vcf.gz"
-    bcftools stats ${params.project}.sorted.concat.vcf.gz > filtered.stats
+    bcftools concat -f vcflist.txt -Oz -o "${params.cohortName}.sorted.concat.vcf.gz"
+    bcftools stats ${params.cohortName}.sorted.concat.vcf.gz > filtered.stats
     """
 }
 

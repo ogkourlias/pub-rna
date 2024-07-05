@@ -20,6 +20,7 @@ import cmd
 import os
 import csv
 import subprocess
+import pandas as pd
 
 # File > Tissue > Study > Sample
 
@@ -135,8 +136,8 @@ class CLI(cmd.Cmd):
                     if "inputDir" in line:
                         study_config.write(f"\tinputDir = \"{self.output}/whole-blood/{study}/genotypes\"\n")
                         continue
-                    if "project" in line:
-                        study_config.write(f"\tproject = \"{study}\"\n")
+                    if "cohortName" in line:
+                        study_config.write(f"\tcohortName = \"{study}\"\n")
                         continue
                     study_config.write(line)
 
@@ -229,6 +230,45 @@ class CLI(cmd.Cmd):
                                         else:
                                             if not os.path.exists(f"{self.output}{tissue}/{study}/impute"):
                                                 impute_todo.write(f"{tissue} {study}\n")
+    def do_stats(self, line):
+        """Print all tissues."""
+        for tissue in self.file.tissues:
+            if os.path.exists(f"{self.output}/{tissue}"):
+                with open(f"{self.output}/{tissue}/stats.txt", "w") as stats, open(f"{self.output}/{tissue}/stats_lower_30.txt", "w") as stats_lower:
+                    stats.write(f"study\tsample_pre_filter\tsample_post_filter\tvariant_pre_filter\tvariant_post_filter\tvariant_post_impute\n")
+                    for study in self.file.tissues[tissue].studies:
+                        variant_pre_impute = "N/A"
+                        sample_post_filter = 'N/A'
+                        variant_post_filter = 'N/A'
+                        variant_post_impute = 'N/A'
+                        variant_pre_filter = 'N/A'
+                        if len(self.file.tissues[tissue].studies[study].samples) >= 30:
+                            if os.path.exists(f"{self.output}/{tissue}/{study}/qc/final"):
+                                with open(f"{self.output}/{tissue}/{study}/qc/final/null.beagle.log", "r") as qc_stats:
+                                    for line in qc_stats:
+                                        if "samples" in line:
+                                            sample_post_filter = line.split(" ")[0]
+                                        if "variants" in line:
+                                            variant_post_filter = line.split(" ")[0]
+
+                            if os.path.exists(f"{self.output}/{tissue}/{study}/qc/variant_filter"):
+                                variant_pre_filter = 0
+                                for chr in range(1, 23):
+                                    with open(f"{self.output}/{tissue}/{study}/qc/variant_filter/chr{chr}.prefilter.stats", "r") as qc_stats:
+                                        for line in qc_stats:
+                                            if "SN" in line:
+                                                if "number of records" in line:
+                                                    variant_pre_filter += int(line.split("\t")[-1])
+                        else:
+                            stats_lower.write(f"{study}\t{len(self.file.tissues[tissue].studies[study].samples)}\n")
+
+                                                    # if os.path.exists(f"{self.output}/{tissue}/{study}/impute"):
+                        #     with open(f"{self.output}/{tissue}/{study}/impute/impute.log", "r") as imp_stats:
+                        #         for line in imp_stats:
+                        #             if "variants" in line:
+                        #                 variant_post_impute = line.split(" ")[0]
+                        
+                        stats.write(f"{study}\t{len(self.file.tissues[tissue].studies[study].samples)}\t{sample_post_filter}\t{variant_pre_filter}\t{variant_post_filter}\t{variant_post_impute}\n")
 
     def do_finished_study(self, line):
         """Print all finished samples."""
@@ -237,7 +277,21 @@ class CLI(cmd.Cmd):
         #     for study in self.file.tissues[tissue].studies:
         #         for sample in self.file.tissues[tissue].studies[study].samples:
         #             print(f"{tissue} : {study} : {sample}")
+    
+    def do_join_exp(self, line):
+        for tissue in line.split(" "):
+            df_list = []
+            for study in self.file.tissues[tissue].studies:
+                if len(self.file.tissues[tissue].studies[study].samples) >= 30:
+                    if os.path.exists(f"{self.output}/whole-blood/{study}/exp/10_final_covariate_correction/{study}_gene_counts-TMM.SampleSelection.ProbesWithZeroVarianceRemoved.Log2Transformed.forcenormal.covariatecorrected.txt.gz.CovariatesRemovedOLS.txt.gz"):
+                        with gzip.open(f"{self.output}/whole-blood/{study}/exp/10_final_covariate_correction/{study}_gene_counts-TMM.SampleSelection.ProbesWithZeroVarianceRemoved.Log2Transformed.forcenormal.covariatecorrected.txt.gz.CovariatesRemovedOLS.txt.gz", "r") as exp:
+                            df = pd.read_csv(exp, sep="\t")
+                            df_list.append(df)
 
+                    else:
+                        print(f"{study} not finished")
+            if len(df_list) > 0:
+                df = pd.merge(df_list[0], df_list[1], on=0)
 
     def do_exit(self, line):
         """Exit the CLI."""

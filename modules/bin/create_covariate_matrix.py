@@ -272,10 +272,16 @@ if __name__ == '__main__':
 
     for sample in os.listdir(f'{input_directory}/'):
         if "QC" not in sample and "genotypes" not in sample and "exp" not in sample and "qc" not in sample:
+            try:
                 col, val = get_all_metrics(sample, input_directory + '/' + sample)
                 columns = col
                 values.append(val)
                 samples.append(sample)
+            except:
+                error_file.write(f'Error processing sample {sample}\n')
+                print(f'Error processing sample {sample}')
+
+
             # get_all_metrics(sample, input_directory)
             # print(sample)
             # try:

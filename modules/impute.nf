@@ -157,7 +157,7 @@ process minimac_imputation{
     maxRetries 2
     time '12h'
     memory '32 GB'
-    cpus 1
+    cpus 4
 
     input:
     path vcf
@@ -175,8 +175,9 @@ process minimac_imputation{
     --prefix ${vcf.SimpleName} \
     --format GT,DS,GP \
     --noPhoneHome \
-    --ChunkLengthMb 50 \
-    --minRatio 0.01
+    --minRatio 0.0000001 \
+    --ChunkLengthMb 300 \
+    --cpus 4
     """
 }
 
