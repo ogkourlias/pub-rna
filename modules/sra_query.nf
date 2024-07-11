@@ -41,7 +41,7 @@ process prefetch {
 }
 
 process fasterq_dump {
-  maxForks 10
+  maxForks 20
   maxRetries 6
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   memory '16 GB'

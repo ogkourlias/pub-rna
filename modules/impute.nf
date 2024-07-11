@@ -196,7 +196,7 @@ process filter_r2_maf{
 
     script:
     """
-    bcftools filter -i 'INFO/R2>=0.3 && INFO/MAF>=0.01' ${vcf} -o ${vcf.SimpleName}.filtered.dose.vcf.gz
+    bcftools filter -i 'INFO/R2>=0.3 && INFO/MAF>=0.01' ${vcf} -Oz -o ${vcf.SimpleName}.filtered.dose.vcf.gz
     """
 }
 

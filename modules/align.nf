@@ -69,7 +69,7 @@ process alignWithSTAR {
   
   publishDir "${params.out_dir}/${sample_dir}/star", mode: 'move', pattern: "*.{gz}"
   maxRetries 2
-  maxForks 10
+  maxForks 20
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '6h'
   memory '48 GB'

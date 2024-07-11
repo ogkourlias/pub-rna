@@ -14,6 +14,7 @@ __version__ = "0.1"
 
 # IMPORTS
 import sys
+import glob
 import argparse
 import gzip
 import cmd
@@ -21,6 +22,7 @@ import os
 import csv
 import subprocess
 import pandas as pd
+from functools import reduce
 
 # File > Tissue > Study > Sample
 
@@ -244,7 +246,7 @@ class CLI(cmd.Cmd):
                         variant_pre_filter = 'N/A'
                         if len(self.file.tissues[tissue].studies[study].samples) >= 30:
                             if os.path.exists(f"{self.output}/{tissue}/{study}/qc/final"):
-                                with open(f"{self.output}/{tissue}/{study}/qc/final/null.beagle.log", "r") as qc_stats:
+                                with open(f"{self.output}/{tissue}/{study}/qc/final/{study}.beagle.log", "r") as qc_stats:
                                     for line in qc_stats:
                                         if "samples" in line:
                                             sample_post_filter = line.split(" ")[0]
@@ -291,7 +293,33 @@ class CLI(cmd.Cmd):
                     else:
                         print(f"{study} not finished")
             if len(df_list) > 0:
-                df = pd.merge(df_list[0], df_list[1], on=0)
+                df = reduce(lambda x, y: pd.merge(x, y, on="-", how='outer'), df_list)
+                df.fillna(0, inplace=True)
+                df.to_csv(f"{self.output}/{tissue}/{tissue}.txt.gz", compression='gzip', sep="\t", index=False)
+
+    def do_meta(self, line):
+        for tissue in line.split(" "):
+            with open(f"{self.output}/{tissue}-meta/gte.txt", "w") as gte:
+                df_list = []
+                for study in self.file.tissues[tissue].studies:
+                    if len(self.file.tissues[tissue].studies[study].samples) >= 30:
+                        # Check if study has expression file
+                        if os.path.exists(f"{self.output}/whole-blood/{study}/exp/10_final_covariate_correction/{study}_gene_counts-TMM.SampleSelection.ProbesWithZeroVarianceRemoved.Log2Transformed.forcenormal.covariatecorrected.txt.gz.CovariatesRemovedOLS.txt.gz"):
+                            with gzip.open(f"{self.output}/whole-blood/{study}/exp/10_final_covariate_correction/{study}_gene_counts-TMM.SampleSelection.ProbesWithZeroVarianceRemoved.Log2Transformed.forcenormal.covariatecorrected.txt.gz.CovariatesRemovedOLS.txt.gz", "r") as exp:
+                                df = pd.read_csv(exp, sep="\t")
+                                df['-'] = df['-'].str.split(".").str[0]
+                                df_list.append(df)
+
+                        # Create gte file
+                            for sample in self.file.tissues[tissue].studies[study].samples:
+                                gte.write(f"{sample}\t{sample}\t{study}\n")
+                
+                if len(df_list) > 0:
+                    df = reduce(lambda x, y: pd.merge(x, y, on="-", how='outer'), df_list)
+                    df.fillna(0, inplace=True)
+                    df.to_csv(f"{self.output}/{tissue}-meta/{tissue}-exp.txt.gz", compression='gzip', sep="\t", index=False)
+                    df.to_csv(f"{self.output}/{tissue}-meta/{tissue}-genes.txt.gz", columns = "-", header = False, index=False, compression='gzip')
+
 
     def do_exit(self, line):
         """Exit the CLI."""
