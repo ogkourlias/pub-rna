@@ -2,9 +2,7 @@
 
 """
     usage:
-        ./vcf_rompare.py -f [INPUT VCF FILE] -r [VCF COMPARISON FILE]
-        -ih [INPUT HEADERS TEXT FILE] -ch [COMPARISON HEADER TEXT FILE]
-        -chr [CHROMOSOME TEXT FILE] -n [CHUNKSIZE (Variant amount per run)]
+    python3 pub-rna.py
 """
 
 # METADATA VARIABLES
@@ -32,16 +30,18 @@ class CLI(cmd.Cmd):
     intro = """
 
     Welcome to Pub-RNA CLI. Type help or ? to list commands.
-    csv [csv-path] : Load CSV file. REQUIRED
-    output [output-path] : Set base output path.
+    Before contniuing, make sure configs in modules and pub-rna.config are configured correctly.
+
     exit : Exit the CLI
-
-    Data Queries:
-    tissues : List all tissues
-    studies : List all studies
-    samples : List all samples
-    finished : List all finished samples
-
+    Queries:
+    gt [study] [study] ... : Start genotyping pipeline for study(s)
+    qc [study] [study] ... : Start genotype QC pipeline for study(s)
+    exp [study] [study] ... : Start expression pipeline for study(s)
+    impute [study] [study] ... : Start imputation pipeline for study(s)
+    check : Check all studies and create todo lists in work directory
+    stats : Create stats file for specified tissue(s)
+    join_exp [tissue] [tissue] ... : Join expression files for all studies specified tissue(s)
+    meta [tissue] [tissue] ... : Prepare meta-analysis files for specified tissue(s)
 
     """
 
@@ -81,14 +81,11 @@ class CLI(cmd.Cmd):
                         else:
                             self.todo[tissue].append(study)
 
-    def do_stop(self, line):
-        """Stop study(s)."""
-        for study in line.split(" "):
-            os.system(f"tmux kill-session -t {study}")
-            os.system(f"rm -r {study}")
-    
+    def do_help(self, line):
+        print(self.intro)
+
     def do_gt(self, line):
-        """Start all studies."""
+        """Start genotyping pipeline for study(s)."""
         print(f"Creating gt_configs directory at {self.work_dir}/gt_configs")
         os.makedirs(f"{self.work_dir}/gt_configs", exist_ok=True)
         for study in line.split(" "):
@@ -122,7 +119,7 @@ class CLI(cmd.Cmd):
             os.system(f"tmux new -d -s gt_{study} -c {self.work_dir}/gt/{study}; tmux send-keys -t gt_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/align_gt.nf -c {self.work_dir}/gt_configs/{study}.config\' Enter")
 
     def do_qc(self, line):
-        """Start all studies."""
+        """Start genotype QC pipeline for study(s)."""
         print(f"Creating qc_configs directory at {self.work_dir}/qc_configs")
         os.makedirs(f"{self.work_dir}/qc_configs", exist_ok=True)
         for study in line.split(" "):
@@ -145,18 +142,6 @@ class CLI(cmd.Cmd):
 
             os.makedirs(f"{self.work_dir}/qc/{study}", exist_ok=True)
             os.system(f"tmux new -d -s qc_{study} -c {self.work_dir}/qc/{study}; tmux send-keys -t qc_{study} \'ml Java && {self.pipeline_dir}/nextflow run {self.pipeline_dir}/modules/qc.nf -c {self.work_dir}/qc_configs/{study}.config\' Enter")
-
-
-    def do_todo(self, line):
-        """Print all unfinished samples."""
-        for tissue_input in line.split(" "):
-            if "*" not in tissue_input:
-                print(f"-- {tissue_input} --")
-                [print(f"{study}: {len(self.file.tissues[tissue_input].studies[study].samples)}") for study in self.todo[tissue_input]]
-            else:
-                for tissue in self.file.tissues:
-                    print(f"-- {tissue} --")
-                    [print(f"{study}: {len(self.file.tissues[tissue].studies[study].samples)}") for study in self.todo[tissue]]
 
     def do_exp(self, line):
         """Start all studies."""
@@ -233,7 +218,7 @@ class CLI(cmd.Cmd):
                                             if not os.path.exists(f"{self.output}{tissue}/{study}/impute"):
                                                 impute_todo.write(f"{tissue} {study}\n")
     def do_stats(self, line):
-        """Print all tissues."""
+        """Create stats file for specified tissue(s)."""
         for tissue in self.file.tissues:
             if os.path.exists(f"{self.output}/{tissue}"):
                 with open(f"{self.output}/{tissue}/stats.txt", "w") as stats, open(f"{self.output}/{tissue}/stats_lower_30.txt", "w") as stats_lower:
@@ -271,14 +256,6 @@ class CLI(cmd.Cmd):
                         #                 variant_post_impute = line.split(" ")[0]
                         
                         stats.write(f"{study}\t{len(self.file.tissues[tissue].studies[study].samples)}\t{sample_post_filter}\t{variant_pre_filter}\t{variant_post_filter}\t{variant_post_impute}\n")
-
-    def do_finished_study(self, line):
-        """Print all finished samples."""
-        ...
-        # for tissue in self.file.tissues:
-        #     for study in self.file.tissues[tissue].studies:
-        #         for sample in self.file.tissues[tissue].studies[study].samples:
-        #             print(f"{tissue} : {study} : {sample}")
     
     def do_join_exp(self, line):
         for tissue in line.split(" "):
