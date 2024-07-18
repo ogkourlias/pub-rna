@@ -77,6 +77,7 @@ RUN apt-get update -y \
 RUN R -e "install.packages(c('bigstatsr', 'bigparallelr', 'bigsparser', 'bigreadr', 'bigutilsr', 'runonce', 'roptim', 'bigreadr', 'bigsnpr', 'dplyr', 'ggplot2', 'data.table', 'optparse', 'patchwork', 'stringr', 'rmarkdown', 'Cairo', 'igraph'))"  
 RUN R -e "install.packages('BiocManager', repos='http://cran.us.r-project.org')"
 RUN R -e "BiocManager::install('edgeR')"
+RUN R -e "BiocManager::install('qvalue')"
 
 # Lang packages
 RUN pip install pytabix==0.1 \
