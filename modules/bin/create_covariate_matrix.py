@@ -271,16 +271,11 @@ if __name__ == '__main__':
     error_file = open('failed_samples.txt', 'w')
 
     for sample in os.listdir(f'{input_directory}/'):
-        if "QC" not in sample and "genotypes" not in sample and "exp" not in sample and "qc" not in sample:
-            try:
-                col, val = get_all_metrics(sample, input_directory + '/' + sample)
-                columns = col
-                values.append(val)
-                samples.append(sample)
-            except:
-                error_file.write(f'Error processing sample {sample}\n')
-                print(f'Error processing sample {sample}')
-
+        if "qc" not in sample and "genotypes" not in sample and "exp" not in sample and "QC" not in sample and "impute" not in sample:
+            col, val = get_all_metrics(sample, input_directory + '/' + sample)
+            columns = col
+            values.append(val)
+            samples.append(sample)
 
             # get_all_metrics(sample, input_directory)
             # print(sample)

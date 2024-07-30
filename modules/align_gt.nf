@@ -2,7 +2,7 @@
 nextflow.enable.dsl=2
 include { prefetch; fastq_dump; fasterq_dump } from './sra_query.nf'
 include { convertBAMToFASTQ; fastqcQualityControl; alignWithSTAR; sortBAM; markDuplicates; QCwithRNASeqMetrics; QCwithMultipleMetrics; identifyAlternativeSplicingSitesrMATS; identifyAlternativeSplicingSitesLeafCutter; convertBAMToCRAM } from './align.nf'
-include { indexBam; encodeConvert; splitNCigarReads; AddOrReplaceReadGroups; baseRecalibrator; applyBQSR; haplotypeCaller; genomicsDBImport; jointGenotype } from './genotype.nf'
+include { indexBam; encodeConvert; splitNCigarReads; AddOrReplaceReadGroups; baseRecalibrator; applyBQSR; haplotypeCaller; genomicsDBImport; jointGenotype; tabix } from './genotype.nf'
 include { fastqRm; bamRm; encodedRm; recaldRm; gdbRm; bqsrRm } from './rm.nf'
 
 workflow {
@@ -50,14 +50,30 @@ workflow {
     haplotypeCaller(applyBQSR.output.bam_file)
     bqsrRm(applyBQSR.output.work_dir, haplotypeCaller.output)
     gvcfs = haplotypeCaller.output.collect()
+    tabix(haplotypeCaller.output)
+    tbi_files = tabix.output.collect()
     chrs = Channel.from( 1..22 )
-    genomicsDBImport(gvcfs, chrs)
+    genomicsDBImport(gvcfs, tbi_files, chrs)
     jointGenotype(genomicsDBImport.output.gdb_path)
     }
 
     workflow GenotypeGVCFs{
     gvcfs = Channel.fromPath("${params.out_dir}/*/gvcf/*.gvcf.gz").collect()
+    gvcf_channels = Channel.fromPath("${params.out_dir}/*/gvcf/*.gvcf.gz")
+    tabix(gvcf_channels)
+    tbi_files = tabix.output.collect()
     chrs = Channel.from( 1..22 )
-    genomicsDBImport(gvcfs, chrs)
+    genomicsDBImport(gvcfs, tbi_files, chrs)
     jointGenotype(genomicsDBImport.output.gdb_path)
     }
+
+    workflow GenotypeGVCFs_test{
+    gvcfs = Channel.fromPath("/scratch/hb-functionalgenomics/projects/public-rna/data/brain-cortex-fetal/ERP016243/*/gvcf/*.gvcf.gz").collect()
+    gvcf_channels = Channel.fromPath("/scratch/hb-functionalgenomics/projects/public-rna/data/brain-cortex-fetal/ERP016243/*/gvcf/*.gvcf.gz")
+    tabix(gvcf_channels)
+    tbi_files = tabix.output.collect()
+    chrs = Channel.from( 1..22 )
+    genomicsDBImport(gvcfs, tbi_files, chrs)
+    jointGenotype(genomicsDBImport.output.gdb_path)
+    }
+

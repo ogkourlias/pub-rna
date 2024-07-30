@@ -17,8 +17,8 @@ process fastqRm {
   script:
   """
   sleep 5
-  rm -rf ${fasterq_dump_work}/
-  rm -rf ${fastqcQualityControl_work}/
+  rm -rf ${fasterq_dump_work}/*
+  rm -rf ${fastqcQualityControl_work}/*
   """
 }
 
@@ -45,14 +45,14 @@ process bamRm {
   script:
   """
   sleep 5
-  rm -rf ${alignWithSTAR_work}/
-  rm -rf ${sortBAM_work}/
-  rm -rf ${markDuplicates_work}/
-  rm -rf ${QCwithRNASeqMetrics_work}/
-  rm -rf ${QCwithMultipleMetrics_work}/
-  rm -rf ${identifyAlternativeSplicingSitesrMATS_work}/
-  rm -rf ${identifyAlternativeSplicingSitesLeafCutter_work}/
-  rm -rf ${encodeConvert_work}/
+  rm -rf ${alignWithSTAR_work}/*
+  rm -rf ${sortBAM_work}/*
+  rm -rf ${markDuplicates_work}/*
+  rm -rf ${QCwithRNASeqMetrics_work}/*
+  rm -rf ${QCwithMultipleMetrics_work}/*
+  rm -rf ${identifyAlternativeSplicingSitesrMATS_work}/*
+  rm -rf ${identifyAlternativeSplicingSitesLeafCutter_work}/*
+  rm -rf ${encodeConvert_work}/*
   """
 }
 
@@ -73,9 +73,9 @@ process encodedRm {
   script:
   """
   sleep 5
-  rm -rf ${encodeConvert_work}/
-  rm -rf ${splitNCigarReads_work}/
-  rm -rf ${AddOrReplaceReadGroups_work}/
+  rm -rf ${encodeConvert_work}/*
+  rm -rf ${splitNCigarReads_work}/*
+  rm -rf ${AddOrReplaceReadGroups_work}/*
   """
 }
 
@@ -95,8 +95,8 @@ process recaldRm {
   script:
   """
   sleep 5
-  rm -rf ${baseRecalibrator_work}/
-  rm -rf ${applyBQSR_work}/
+  rm -rf ${baseRecalibrator_work}/*
+  rm -rf ${applyBQSR_work}/*
   """
 }
 
@@ -115,9 +115,9 @@ process gdbRm {
   script:
   """
   sleep 5
-  rm -rf ${haplotypeCaller_work}/
-  rm -rf ${genomicsDBImport_work}/
-  rm -rf ${jointGenotype_work}/
+  rm -rf ${haplotypeCaller_work}/*
+  rm -rf ${genomicsDBImport_work}/*
+  rm -rf ${jointGenotype_work}/*
   """
 }
 

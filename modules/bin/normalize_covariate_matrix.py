@@ -35,10 +35,22 @@ if __name__ == '__main__':
 
     # Set metric name as row index
     matrix.set_index('metric', inplace=True)
-
+    # Apply pd.to_numeric to all columns except the first one, coerce errors to NaN
+    if 'INSERT_METRICS_STANDARD_DEVIATION' in matrix.index:
+        read_type = matrix.loc['INSERT_METRICS_STANDARD_DEVIATION'] != 0
+        read_type = [float(1) if i else float(0) for i in read_type]
+        matrix.loc["READ_TYPE"] = read_type
+    numeric_matrix = matrix.apply(lambda x: pd.to_numeric(x, errors='coerce'))
+    print(matrix)
+    print(numeric_matrix)
+    # Combine the first column back with the numeric matrix
+    #combined_matrix = pd.concat([matrix.iloc[:, [0]], numeric_matrix], axis=1)
+    #print rows containing NaN
+    #print(combined_matrix[combined_matrix.isnull().any(axis=1)])
+    # Drop rows where any cell in the numeric part is NaN
+    matrix = numeric_matrix.dropna()
     # Remove rows without variance
     matrix = matrix[matrix.apply(lambda row: row.nunique() > 1, axis=1)]
-
     # Normalize the data
     normalized = force_normalise(matrix.values, 1)
 

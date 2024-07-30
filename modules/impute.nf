@@ -193,10 +193,12 @@ process filter_r2_maf{
 
     output:
     path "${vcf.SimpleName}.filtered.dose.vcf.gz"
+    path "${vcf.SimpleName}.filtered.dose.vcf.gz.tbi"
 
     script:
     """
     bcftools filter -i 'INFO/R2>=0.3 && INFO/MAF>=0.01' ${vcf} -Oz -o ${vcf.SimpleName}.filtered.dose.vcf.gz
+    tabix ${vcf.SimpleName}.filtered.dose.vcf.gz
     """
 }
 

@@ -400,11 +400,12 @@ process genomicsDBImport {
   maxRetries 2
   errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
   time '72h'
-  memory '32 GB'
+  memory '64 GB'
   cpus 4
 
   input:
   path gvcfs
+  path tbi_files
   val i
 
   output:
@@ -414,18 +415,36 @@ process genomicsDBImport {
   """
   for GVCF in ${gvcfs}
   do
-    tabix \$GVCF
     echo "\${GVCF%%.*}\t\$GVCF" >> cohort.sample_map
   done
-  gatk --java-options "-Xmx28g" GenomicsDBImport \
+  gatk --java-options "-Xmx58g" GenomicsDBImport \
   --genomicsdb-workspace-path chr${i}.gdb \
-  --batch-size 200 \
   --sample-name-map cohort.sample_map \
+  --genomicsdb-shared-posixfs-optimizations true \
   -L chr${i} \
   --reader-threads 4
   """
 }
 
+process tabix {
+  storeDir  "${params.out_dir}/${gvcf.SimpleName}/genotypes"
+  maxRetries 2
+  errorStrategy  { task.attempt <= maxRetries  ? 'retry' : 'ignore' }
+  time '6h'
+  memory '8 GB'
+  cpus 1
+
+  input:
+  path gvcf
+
+  output:
+  path "${gvcf}.tbi", emit: tbi
+  
+  script:
+  """
+  tabix ${gvcf}
+  """
+}
 
 //workflow {
 //    cram_files = Channel.fromPath("${params.cram_dir}/*/*.cram")
